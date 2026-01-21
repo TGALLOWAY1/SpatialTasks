@@ -2,7 +2,7 @@
 
 A professional, local-first node canvas application for planning and executing complex flows. Inspired by the visual logic of TouchDesigner, SpatialTasks introduces **recursive subgraphs**—allowing nodes to contain entire canvases within them.
 
-![SpatialTasks Screenshot](https://raw.githubusercontent.com/TGALLOWAY1/SpatialTasks/main/public/preview.png) *(Note: Add your own demo image here)*
+<img width="3600" height="1470" alt="image" src="https://github.com/user-attachments/assets/aeb3ffd7-8f0b-4129-94f7-37f053ffa57f" />
 
 ## 🚀 Key Features
 
