@@ -1,4 +1,4 @@
-import { Graph, Node, Edge, NodeStatus, Workspace } from '../types';
+import { Graph, Node, Workspace } from '../types';
 
 /**
  * Checks if a node is blocked by any incoming dependencies.

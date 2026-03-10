@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Sidebar } from './components/Layout/Sidebar';
 import { TopBar } from './components/Layout/TopBar';
 import { CanvasArea } from './components/Canvas/CanvasArea';
+import { ToastContainer } from './components/UI/Toast';
 import { useWorkspaceStore } from './store/workspaceStore';
 
 function App() {
@@ -24,7 +25,7 @@ function App() {
                 <TopBar />
                 <CanvasArea />
             </div>
-            {/* Right panel (Inspector) could go here */}
+            <ToastContainer />
         </div>
     );
 }

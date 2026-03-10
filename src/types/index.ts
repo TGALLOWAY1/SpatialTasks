@@ -56,8 +56,18 @@ export interface Project {
     updatedAt: string;
 }
 
+export type GeminiConnectionStatus = 'no_key' | 'configured' | 'error';
+
+export interface GeminiSubtask {
+    id: string;
+    title: string;
+    dependsOn: string[];
+}
+
 export interface WorkspaceSettings {
     theme?: 'dark' | 'light';
+    geminiApiKey?: string;
+    geminiStatus?: GeminiConnectionStatus;
     [key: string]: any;
 }
 

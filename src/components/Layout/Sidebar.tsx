@@ -1,52 +1,177 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useToastStore } from '../UI/Toast';
 import { clsx } from 'clsx';
-import { FolderGit2, RefreshCw } from 'lucide-react';
+import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
     const projects = useWorkspaceStore(state => state.projects);
     const activeProjectId = useWorkspaceStore(state => state.activeProjectId);
     const loadProject = useWorkspaceStore(state => state.loadProject);
     const resetWorkspace = useWorkspaceStore(state => state.resetWorkspace);
+    const settings = useWorkspaceStore(state => state.settings);
+    const updateSettings = useWorkspaceStore(state => state.updateSettings);
+    const addToast = useToastStore(state => state.addToast);
+
+    const [showSettings, setShowSettings] = useState(false);
+    const [showKey, setShowKey] = useState(false);
+    const [keyInput, setKeyInput] = useState(settings.geminiApiKey || '');
+
+    const geminiStatus = settings.geminiStatus || (settings.geminiApiKey ? 'configured' : 'no_key');
+
+    const handleSaveKey = () => {
+        const trimmed = keyInput.trim();
+        if (trimmed) {
+            updateSettings({ geminiApiKey: trimmed, geminiStatus: 'configured' });
+            addToast('Gemini API key saved.', 'success');
+        } else {
+            updateSettings({ geminiApiKey: undefined, geminiStatus: 'no_key' });
+            addToast('API key cleared.', 'info');
+        }
+    };
+
+    const handleRemoveKey = () => {
+        setKeyInput('');
+        updateSettings({ geminiApiKey: undefined, geminiStatus: 'no_key' });
+        addToast('API key removed.', 'info');
+    };
 
     return (
         <div className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col h-full">
-            <div className="p-4 border-b border-gray-800">
+            <div className="p-4 border-b border-gray-800 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <FolderGit2 className="w-5 h-5 text-purple-400" />
                     SpatialTasks
                 </h2>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">Projects</h3>
-                <div className="space-y-1">
-                    {projects.map(project => (
-                        <button
-                            key={project.id}
-                            onClick={() => loadProject(project.id)}
-                            className={clsx(
-                                "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                                activeProjectId === project.id
-                                    ? "bg-purple-900/30 text-purple-300 border border-purple-800"
-                                    : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
-                            )}
-                        >
-                            {project.title}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            <div className="p-4 border-t border-gray-800">
                 <button
-                    onClick={() => resetWorkspace(Math.random().toString())}
-                    className="flex items-center gap-2 text-xs text-gray-500 hover:text-white w-full px-2 py-2"
+                    onClick={() => setShowSettings(!showSettings)}
+                    className={clsx(
+                        "p-1.5 rounded-md transition-colors",
+                        showSettings
+                            ? "bg-gray-700 text-white"
+                            : "text-gray-500 hover:text-white hover:bg-gray-800"
+                    )}
+                    title="Settings"
                 >
-                    <RefreshCw className="w-3 h-3" />
-                    Regenerate Data
+                    <Settings className="w-4 h-4" />
                 </button>
             </div>
+
+            {showSettings ? (
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    <button
+                        onClick={() => setShowSettings(false)}
+                        className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
+                    >
+                        <ArrowLeft className="w-3 h-3" />
+                        Back to projects
+                    </button>
+
+                    <div>
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                            Gemini API Key
+                        </h3>
+
+                        <div className="flex items-center gap-1 mb-2">
+                            <KeyRound className="w-3.5 h-3.5 text-gray-500" />
+                            <div className="flex items-center gap-1.5">
+                                <div className={clsx(
+                                    "w-2 h-2 rounded-full",
+                                    geminiStatus === 'configured' && "bg-green-500",
+                                    geminiStatus === 'error' && "bg-red-500",
+                                    geminiStatus === 'no_key' && "bg-gray-600",
+                                )} />
+                                <span className="text-xs text-gray-400">
+                                    {geminiStatus === 'configured' && 'Key configured'}
+                                    {geminiStatus === 'error' && 'Last request failed'}
+                                    {geminiStatus === 'no_key' && 'No key configured'}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="relative mb-2">
+                            <input
+                                type={showKey ? 'text' : 'password'}
+                                value={keyInput}
+                                onChange={(e) => setKeyInput(e.target.value)}
+                                placeholder="Paste your API key..."
+                                className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 pr-8"
+                            />
+                            <button
+                                onClick={() => setShowKey(!showKey)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                            >
+                                {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleSaveKey}
+                                disabled={!keyInput.trim()}
+                                className={clsx(
+                                    "flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                                    keyInput.trim()
+                                        ? "bg-purple-600 hover:bg-purple-500 text-white"
+                                        : "bg-gray-800 text-gray-600 cursor-not-allowed"
+                                )}
+                            >
+                                Save Key
+                            </button>
+                            {settings.geminiApiKey && (
+                                <button
+                                    onClick={handleRemoveKey}
+                                    className="px-3 py-1.5 rounded-md text-xs font-medium bg-gray-800 text-red-400 hover:bg-red-950 hover:text-red-300 transition-colors flex items-center gap-1"
+                                >
+                                    <Trash2 className="w-3 h-3" />
+                                    Remove
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="space-y-2 pt-2 border-t border-gray-800">
+                        <p className="text-xs text-gray-500 leading-relaxed">
+                            Magic Expand uses Google's Gemini AI to automatically break down tasks into subtasks.
+                        </p>
+                        <p className="text-[10px] text-gray-600 leading-relaxed">
+                            Your key is stored locally in this browser only. It is sent only to Google's Gemini API endpoint.
+                        </p>
+                    </div>
+                </div>
+            ) : (
+                <>
+                    <div className="flex-1 overflow-y-auto p-2">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">Projects</h3>
+                        <div className="space-y-1">
+                            {projects.map(project => (
+                                <button
+                                    key={project.id}
+                                    onClick={() => loadProject(project.id)}
+                                    className={clsx(
+                                        "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
+                                        activeProjectId === project.id
+                                            ? "bg-purple-900/30 text-purple-300 border border-purple-800"
+                                            : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                                    )}
+                                >
+                                    {project.title}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="p-4 border-t border-gray-800">
+                        <button
+                            onClick={() => resetWorkspace(Math.random().toString())}
+                            className="flex items-center gap-2 text-xs text-gray-500 hover:text-white w-full px-2 py-2"
+                        >
+                            <RefreshCw className="w-3 h-3" />
+                            Regenerate Data
+                        </button>
+                    </div>
+                </>
+            )}
         </div>
     );
 };

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Workspace, Node } from '../types';
+import { Workspace, Node, Graph, Edge, WorkspaceSettings } from '../types';
 import { generateWorkspace } from '../utils/generator';
 
 interface WorkspaceState extends Workspace {
@@ -15,6 +15,9 @@ interface WorkspaceState extends Workspace {
     // Graph edits
     addNode: (node: Node) => void;
     updateNode: (nodeId: string, data: Partial<Node>) => void;
+    addGraph: (graph: Graph) => void;
+    addEdge: (edge: Edge) => void;
+    updateSettings: (settings: Partial<WorkspaceSettings>) => void;
     onNodesChange: (changes: any[]) => void; // ReactFlow hook
     onEdgesChange: (changes: any[]) => void; // ReactFlow hook
     jsonImport: (json: string) => void;
@@ -107,6 +110,39 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
                 set({
                     graphs: { ...graphs, [activeGraphId]: { ...graph, nodes: updatedNodes } }
+                });
+            },
+
+            addGraph: (graph) => {
+                const { graphs } = get();
+                set({
+                    graphs: { ...graphs, [graph.id]: graph }
+                });
+            },
+
+            addEdge: (edge) => {
+                const { graphs } = get();
+                const targetGraphId = edge.graphId;
+                if (!targetGraphId) return;
+
+                const graph = graphs[targetGraphId];
+                if (!graph) return;
+
+                set({
+                    graphs: {
+                        ...graphs,
+                        [targetGraphId]: {
+                            ...graph,
+                            edges: [...graph.edges, edge]
+                        }
+                    }
+                });
+            },
+
+            updateSettings: (newSettings) => {
+                const { settings } = get();
+                set({
+                    settings: { ...settings, ...newSettings }
                 });
             },
 

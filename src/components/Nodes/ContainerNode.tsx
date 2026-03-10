@@ -1,10 +1,17 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Node } from '../../types';
-import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash } from 'lucide-react';
+import { Node as SpatialNode, Graph, Edge } from '../../types';
+import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { v4 as uuidv4 } from 'uuid';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useToastStore } from '../UI/Toast';
 import { getContainerProgress, isNodeBlocked } from '../../utils/logic';
+import { magicExpand, GeminiError } from '../../services/gemini';
+
+const WIDTH = 200;
+const HEIGHT = 80;
+const PADDING_X = 50;
 
 const ProgressRing = ({ progress }: { progress: number }) => {
     const percentage = Math.round(progress * 100);
@@ -16,32 +23,123 @@ const ProgressRing = ({ progress }: { progress: number }) => {
     );
 };
 
-export const ContainerNode = memo(({ data, selected }: NodeProps<Node>) => {
+export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) => {
     const enterGraph = useWorkspaceStore(state => state.enterGraph);
     const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
     const graphs = useWorkspaceStore(state => state.graphs);
     const executionMode = useWorkspaceStore(state => state.executionMode);
+    const settings = useWorkspaceStore(state => state.settings);
+    const addGraph = useWorkspaceStore(state => state.addGraph);
+    const updateNode = useWorkspaceStore(state => state.updateNode);
+    const updateSettings = useWorkspaceStore(state => state.updateSettings);
+    const addToast = useToastStore(state => state.addToast);
+
+    const [expanding, setExpanding] = useState(false);
 
     const progress = useMemo(() => {
         return getContainerProgress(data, { graphs } as any);
     }, [data, graphs]);
 
-    const { isBlocked, isActionable } = useMemo(() => {
+    const isActionable = useMemo(() => {
         const blocked = activeGraphId ? isNodeBlocked(data, graphs[activeGraphId]) : false;
-        // Container is actionable if not blocked and not 100% done
-        return {
-            isBlocked: blocked,
-            isActionable: !blocked && progress < 1
-        };
+        return !blocked && progress < 1;
     }, [data, activeGraphId, graphs, progress]);
 
     const highlight = executionMode && isActionable;
     const dim = executionMode && !isActionable;
 
+    const hasApiKey = !!settings.geminiApiKey;
+    const hasExistingChildren = !!(data.childGraphId && graphs[data.childGraphId]?.nodes.length > 0);
+
     const handleEnter = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (data.childGraphId) {
             enterGraph(data.childGraphId, data.id, data.title);
+        }
+    };
+
+    const handleMagicExpand = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!settings.geminiApiKey) return;
+
+        if (hasExistingChildren) {
+            if (!window.confirm('This container already has subtasks. Replace them with AI-generated ones?')) {
+                return;
+            }
+        }
+
+        setExpanding(true);
+
+        try {
+            const result = await magicExpand(
+                settings.geminiApiKey,
+                data.title,
+                data.meta?.notes
+            );
+
+            const currentGraph = activeGraphId ? graphs[activeGraphId] : null;
+            const projectId = currentGraph?.projectId || '';
+
+            const childGraphId = uuidv4();
+            const childGraph: Graph = {
+                id: childGraphId,
+                projectId,
+                title: data.title,
+                nodes: [],
+                edges: [],
+                viewport: { x: 0, y: 0, zoom: 1 },
+            };
+
+            // Map Gemini slug IDs to real UUIDs
+            const idMap: Record<string, string> = {};
+
+            result.subtasks.forEach((subtask, index) => {
+                const nodeId = uuidv4();
+                idMap[subtask.id] = nodeId;
+
+                const node: SpatialNode = {
+                    id: nodeId,
+                    graphId: childGraphId,
+                    type: 'action',
+                    title: subtask.title,
+                    x: index * (WIDTH + PADDING_X),
+                    y: (index % 2 === 0) ? 0 : 50,
+                    width: WIDTH,
+                    height: HEIGHT,
+                    status: 'todo',
+                };
+                childGraph.nodes.push(node);
+            });
+
+            result.subtasks.forEach((subtask) => {
+                const targetId = idMap[subtask.id];
+                subtask.dependsOn.forEach((depSlug) => {
+                    const sourceId = idMap[depSlug];
+                    if (sourceId && targetId) {
+                        const edge: Edge = {
+                            id: uuidv4(),
+                            graphId: childGraphId,
+                            source: sourceId,
+                            target: targetId,
+                        };
+                        childGraph.edges.push(edge);
+                    }
+                });
+            });
+
+            addGraph(childGraph);
+            updateNode(data.id, { childGraphId });
+            enterGraph(childGraphId, data.id, data.title);
+
+            addToast(`Generated ${result.subtasks.length} subtasks for "${data.title}"`, 'success');
+        } catch (err) {
+            const geminiErr = err as GeminiError;
+            addToast(geminiErr.message || 'Magic Expand failed.', 'error');
+            if (geminiErr.type === 'invalid_key') {
+                updateSettings({ geminiStatus: 'error' });
+            }
+        } finally {
+            setExpanding(false);
         }
     };
 
@@ -68,13 +166,26 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<Node>) => {
                 <div className="flex justify-between items-center">
                     <ProgressRing progress={progress} />
 
-                    <button
-                        onClick={handleEnter}
-                        className="opacity-100 text-indigo-200 hover:text-white hover:scale-110 transition-all flex items-center justify-center"
-                        title="Enter Subgraph"
-                    >
-                        <ArrowRightCircle className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        {hasApiKey && (
+                            <button
+                                onClick={handleMagicExpand}
+                                disabled={expanding}
+                                className="text-purple-300 hover:text-purple-100 hover:scale-110 transition-all flex items-center justify-center disabled:opacity-50"
+                                title="Magic Expand — AI generates subtasks"
+                            >
+                                {expanding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                            </button>
+                        )}
+
+                        <button
+                            onClick={handleEnter}
+                            className="opacity-100 text-indigo-200 hover:text-white hover:scale-110 transition-all flex items-center justify-center"
+                            title="Enter Subgraph"
+                        >
+                            <ArrowRightCircle className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </div>
 

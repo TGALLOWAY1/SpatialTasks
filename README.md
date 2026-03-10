@@ -1,55 +1,44 @@
-# SpatialTasks 🌌
+# SpatialTasks
 
-A professional, local-first node canvas application for planning and executing complex flows. Inspired by the visual logic of TouchDesigner, SpatialTasks introduces **recursive subgraphs**—allowing nodes to contain entire canvases within them.
+A spatial, node-based task management system. Organize projects as connected nodes on a canvas, open nodes into nested subflows, and navigate through work visually.
 
-<img width="3600" height="1470" alt="image" src="https://github.com/user-attachments/assets/aeb3ffd7-8f0b-4129-94f7-37f053ffa57f" />
+![SpatialTasks Screenshot](screenshot.png)
 
-## 🚀 Key Features
+## Features
 
-- **Nested views (Subgraphs)**: Drill into "Container" nodes to reveal infinite levels of nested logic.
-- **Execution Mode**: Toggle to highlight "Next Actionable" nodes and dim blocked dependencies.
-- **Local-First & Offline**: Data persists in LocalStorage/IndexedDB; no server required.
-- **Deterministic Synthetic Data**: Instant demo via curated scenarios (Morning Flow, Landing Page, Mixdown Pipeline).
-- **Progress Roll-up**: Container nodes automatically calculate status based on leaf node completion.
-- **Premium UX**: Smooth pan/zoom, drag-and-drop handles, and a modern "dark glass" aesthetic.
+- **Spatial Canvas** — Drag-and-drop nodes on an infinite canvas with pan and zoom
+- **Nested Subflows** — Open container nodes to dive into nested workspaces
+- **Visual Progress** — Track completion with progress rings and status indicators
+- **Execution Mode** — Highlights actionable next steps and dims completed/blocked work
+- **Dependency Tracking** — Edges between nodes enforce task ordering
+- **Magic Expand (AI)** — Optionally use your own Gemini API key to auto-decompose tasks into subtask subflows
+- **Persistent State** — All work is saved locally in the browser
 
-## 🛠 Tech Stack
+## Tech Stack
 
-- **Framework**: React 18 + Vite + TypeScript
-- **Canvas Engine**: [React Flow](https://reactflow.dev/) (xyflow)
-- **State Management**: [Zustand](https://github.com/pmndrs/zustand) (with Persistence)
-- **Styling**: TailwindCSS
-- **Icons**: Lucide React
+- React 18 + TypeScript
+- ReactFlow (node-flow canvas)
+- Zustand (state management with localStorage persistence)
+- Tailwind CSS
+- Vite
 
-## 🏁 Quick Start
+## Getting Started
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/TGALLOWAY1/SpatialTasks.git
-   cd SpatialTasks
-   ```
+```bash
+npm install
+npm run dev
+```
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+## Gemini AI (Optional)
 
-3. **Run the development server**
-   ```bash
-   npm run dev
-   ```
+Click the gear icon in the sidebar to add your own [Gemini API key](https://aistudio.google.com/apikey). Once configured, container nodes show a sparkle button that uses Gemini 2.5 Flash to automatically break down tasks into connected subtasks.
 
-4. **Navigate to the app**
-   Open `http://localhost:5173` (or the port indicated in your terminal).
+No API key is required for core functionality.
 
-## 📊 Data Model
+## Deployment
 
-SpatialTasks uses a normalized flat-store for graphs.
-- **Workspace**: Global state, project list, navigation stack.
-- **Project**: A collection of graphs with one designated root.
-- **Graph**: Container for nodes and edges.
-- **Node**: Can be an `action` (leaf) or a `container` (linking to another `graphId`).
+Configured for Vercel. Push to deploy or run:
 
-## 📜 License
-
-MIT
+```bash
+npm run build
+```
