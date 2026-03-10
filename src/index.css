@@ -9,6 +9,34 @@ html, body, #root {
   overflow: hidden;
 }
 
+/* ReactFlow controls — dark theme override */
+.react-flow__controls {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #374151;
+}
+
+.react-flow__controls-button {
+  background: #1f2937;
+  border-bottom: 1px solid #374151;
+  width: 20px;
+  height: 20px;
+  padding: 6px;
+}
+
+.react-flow__controls-button:hover {
+  background: #374151;
+}
+
+.react-flow__controls-button svg {
+  fill: #9ca3af;
+}
+
+.react-flow__controls-button:hover svg {
+  fill: #e5e7eb;
+}
+
 @keyframes slide-in {
     from { transform: translateX(100%); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }
