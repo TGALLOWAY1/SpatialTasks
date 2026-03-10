@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useToastStore } from '../UI/Toast';
 import { clsx } from 'clsx';
-import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft } from 'lucide-react';
+import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
     const projects = useWorkspaceStore(state => state.projects);
@@ -130,12 +130,31 @@ export const Sidebar: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="space-y-2 pt-2 border-t border-gray-800">
+                    <div className="space-y-3 pt-3 border-t border-gray-800">
+                        <h4 className="text-xs font-semibold text-gray-400">How to get a key</h4>
+                        <ol className="text-xs text-gray-500 leading-relaxed space-y-2 list-decimal list-outside pl-4">
+                            <li>
+                                Visit{' '}
+                                <a
+                                    href="https://aistudio.google.com/apikey"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-purple-400 hover:text-purple-300 underline underline-offset-2 inline-flex items-center gap-0.5"
+                                >
+                                    Google AI Studio
+                                    <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                            </li>
+                            <li>Sign in with your Google account</li>
+                            <li>Click <span className="text-gray-300 font-medium">Create API Key</span> and select a project</li>
+                            <li>Copy the key and paste it above</li>
+                        </ol>
+
                         <p className="text-xs text-gray-500 leading-relaxed">
-                            Magic Expand uses Google's Gemini AI to automatically break down tasks into subtasks.
+                            Once saved, container nodes will show a <span className="text-purple-400">sparkle</span> button to auto-generate subtasks with Gemini AI.
                         </p>
                         <p className="text-[10px] text-gray-600 leading-relaxed">
-                            Your key is stored locally in this browser only. It is sent only to Google's Gemini API endpoint.
+                            Your key is stored locally in this browser only and is sent only to Google's Gemini API.
                         </p>
                     </div>
                 </div>
