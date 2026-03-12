@@ -1,25 +1,39 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useEffect, useState } from 'react';
 import ReactFlow, {
     Background,
     Controls,
     Node as RFNode,
     Edge as RFEdge,
-    NodeChange
+    NodeChange,
+    Connection,
+    useReactFlow,
+    ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { v4 as uuidv4 } from 'uuid';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { ContainerNode } from '../Nodes/ContainerNode'; // To be implemented
-import { ActionNode } from '../Nodes/ActionNode'; // To be implemented
+import { ContainerNode } from '../Nodes/ContainerNode';
+import { ActionNode } from '../Nodes/ActionNode';
 
 const nodeTypes = {
     container: ContainerNode,
     action: ActionNode
 };
 
-export const CanvasArea: React.FC = () => {
+const CanvasInner: React.FC = () => {
     const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
     const graphs = useWorkspaceStore(state => state.graphs);
     const updateNode = useWorkspaceStore(state => state.updateNode);
+    const removeNode = useWorkspaceStore(state => state.removeNode);
+    const removeEdge = useWorkspaceStore(state => state.removeEdge);
+    const removeNodes = useWorkspaceStore(state => state.removeNodes);
+    const addEdge = useWorkspaceStore(state => state.addEdge);
+    const addNode = useWorkspaceStore(state => state.addNode);
+
+    const reactFlowInstance = useReactFlow();
+
+    // Quick-add state for double-click on canvas
+    const [quickAdd, setQuickAdd] = useState<{ x: number; y: number; screenX: number; screenY: number } | null>(null);
 
     const graph = activeGraphId ? graphs[activeGraphId] : null;
 
@@ -30,7 +44,7 @@ export const CanvasArea: React.FC = () => {
             id: n.id,
             type: n.type,
             position: { x: n.x, y: n.y },
-            data: { ...n }, // Pass full node object as data
+            data: { ...n },
             draggable: true
         }));
     }, [graph]);
@@ -48,8 +62,6 @@ export const CanvasArea: React.FC = () => {
     }, [graph]);
 
     const onNodesChange = useCallback((changes: NodeChange[]) => {
-        // Basic implementation for dragging
-        // We only care about position changes here for persistence
         changes.forEach(change => {
             if (change.type === 'position' && change.position) {
                 updateNode(change.id, { x: change.position.x, y: change.position.y });
@@ -57,21 +69,129 @@ export const CanvasArea: React.FC = () => {
         });
     }, [updateNode]);
 
+    // Drag-to-connect edges
+    const onConnect = useCallback((connection: Connection) => {
+        if (!activeGraphId || !connection.source || !connection.target) return;
+        if (connection.source === connection.target) return;
+
+        const g = graphs[activeGraphId];
+        const exists = g.edges.some(
+            e => e.source === connection.source && e.target === connection.target
+        );
+        if (exists) return;
+
+        addEdge({
+            id: uuidv4(),
+            graphId: activeGraphId,
+            source: connection.source,
+            target: connection.target,
+        });
+    }, [activeGraphId, graphs, addEdge]);
+
+    // Delete via keyboard
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+            // Don't delete when typing in an input
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+            const selectedNodes = reactFlowInstance.getNodes().filter(n => n.selected);
+            const selectedEdges = reactFlowInstance.getEdges().filter(e => e.selected);
+
+            if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
+
+            // Delete selected edges
+            selectedEdges.forEach(edge => removeEdge(edge.id));
+
+            // Delete selected nodes
+            if (selectedNodes.length > 0) {
+                const hasContainers = selectedNodes.some(n => n.type === 'container');
+                if (hasContainers) {
+                    if (!window.confirm(`Delete ${selectedNodes.length} node(s)? Container nodes and their children will be removed.`)) {
+                        return;
+                    }
+                }
+                removeNodes(selectedNodes.map(n => n.id));
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [reactFlowInstance, removeEdge, removeNode, removeNodes]);
+
+    // Double-click canvas to add node
+    const handlePaneDoubleClick = useCallback((event: React.MouseEvent) => {
+        const flowPosition = reactFlowInstance.screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+        });
+        setQuickAdd({
+            x: flowPosition.x,
+            y: flowPosition.y,
+            screenX: event.clientX,
+            screenY: event.clientY,
+        });
+    }, [reactFlowInstance]);
+
     if (!graph) return <div className="text-gray-500 flex items-center justify-center h-full">No graph selected</div>;
 
     return (
-        <div className="flex-1 h-full bg-gray-950">
+        <div className="flex-1 h-full bg-gray-950 relative" tabIndex={0}>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
                 nodeTypes={nodeTypes as any}
                 onNodesChange={onNodesChange}
+                onConnect={onConnect}
+                onPaneClick={() => setQuickAdd(null)}
+                onDoubleClick={handlePaneDoubleClick}
+                selectionOnDrag
+                multiSelectionKeyCode="Shift"
+                deleteKeyCode={null}
                 fitView
                 className="bg-gray-950"
             >
                 <Background color="#374151" gap={20} />
                 <Controls className="bg-gray-800 border-gray-700 fill-gray-100" />
             </ReactFlow>
+
+            {/* Quick-add input on double-click */}
+            {quickAdd && (
+                <div className="fixed z-50" style={{ left: quickAdd.screenX, top: quickAdd.screenY }}>
+                    <input
+                        autoFocus
+                        placeholder="Task name..."
+                        className="bg-slate-800 border border-slate-600 text-slate-200 px-3 py-1.5 rounded text-sm w-48 outline-none focus:border-purple-500"
+                        onKeyDown={e => {
+                            if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                addNode({
+                                    id: uuidv4(),
+                                    graphId: activeGraphId!,
+                                    type: 'action',
+                                    title: e.currentTarget.value.trim(),
+                                    x: quickAdd.x,
+                                    y: quickAdd.y,
+                                    width: 200,
+                                    height: 50,
+                                    status: 'todo',
+                                });
+                                setQuickAdd(null);
+                            }
+                            if (e.key === 'Escape') setQuickAdd(null);
+                        }}
+                        onBlur={() => setQuickAdd(null)}
+                    />
+                </div>
+            )}
         </div>
+    );
+};
+
+export const CanvasArea: React.FC = () => {
+    return (
+        <ReactFlowProvider>
+            <CanvasInner />
+        </ReactFlowProvider>
     );
 }
