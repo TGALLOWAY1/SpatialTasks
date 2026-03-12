@@ -16,6 +16,7 @@ import { ContainerNode } from '../Nodes/ContainerNode';
 import { ActionNode } from '../Nodes/ActionNode';
 import { ContextMenu, MenuItem } from '../UI/ContextMenu';
 import { ConfirmModal } from '../UI/ConfirmModal';
+import { ActionSheet } from '../UI/ActionSheet';
 import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers } from 'lucide-react';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
@@ -49,6 +50,16 @@ const CanvasInner: React.FC = () => {
         nodeId?: string; edgeId?: string;
         flowX?: number; flowY?: number;
     } | null>(null);
+
+    // Action sheet state (for long-press on touch)
+    const [actionSheet, setActionSheet] = useState<{
+        nodeId?: string;
+        edgeId?: string;
+        flowX?: number;
+        flowY?: number;
+    } | null>(null);
+    const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const longPressFiredRef = useRef(false);
 
     // Custom confirmation modal state (replaces window.confirm)
     const [confirmAction, setConfirmAction] = useState<{
@@ -202,6 +213,168 @@ const CanvasInner: React.FC = () => {
         setContextMenu({ x: event.clientX, y: event.clientY, flowX: flowPosition.x, flowY: flowPosition.y });
     }, [reactFlowInstance]);
 
+    // Long-press handlers for touch devices
+    const clearLongPress = useCallback(() => {
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+    }, []);
+
+    const startLongPress = useCallback((target: { nodeId?: string; edgeId?: string; flowX?: number; flowY?: number }) => {
+        longPressFiredRef.current = false;
+        clearLongPress();
+        longPressTimerRef.current = setTimeout(() => {
+            longPressFiredRef.current = true;
+            try { navigator.vibrate(10); } catch {}
+            setActionSheet(target);
+        }, 500);
+    }, [clearLongPress]);
+
+    // Attach touch handlers to the ReactFlow container for long-press
+    useEffect(() => {
+        if (!isTouchDevice) return;
+
+        const container = document.querySelector('.react-flow');
+        if (!container) return;
+
+        const handleTouchStart = (e: Event) => {
+            const touch = (e as TouchEvent).touches[0];
+            if (!touch) return;
+
+            const target = touch.target as HTMLElement;
+
+            // Find if we're touching a node
+            const nodeEl = target.closest('.react-flow__node');
+            if (nodeEl) {
+                const nodeId = nodeEl.getAttribute('data-id');
+                if (nodeId) {
+                    startLongPress({ nodeId });
+                    return;
+                }
+            }
+
+            // Find if we're touching an edge
+            const edgeEl = target.closest('.react-flow__edge');
+            if (edgeEl) {
+                const edgeId = edgeEl.getAttribute('data-id');
+                if (edgeId) {
+                    startLongPress({ edgeId });
+                    return;
+                }
+            }
+
+            // Pane long-press
+            if (target.closest('.react-flow__pane') || target.closest('.react-flow__background')) {
+                const flowPosition = reactFlowInstance.screenToFlowPosition({
+                    x: touch.clientX,
+                    y: touch.clientY,
+                });
+                startLongPress({ flowX: flowPosition.x, flowY: flowPosition.y });
+            }
+        };
+
+        const handleTouchEnd = () => clearLongPress();
+        const handleTouchMove = () => clearLongPress();
+
+        container.addEventListener('touchstart', handleTouchStart, { passive: true });
+        container.addEventListener('touchend', handleTouchEnd, { passive: true });
+        container.addEventListener('touchmove', handleTouchMove, { passive: true });
+
+        return () => {
+            container.removeEventListener('touchstart', handleTouchStart);
+            container.removeEventListener('touchend', handleTouchEnd);
+            container.removeEventListener('touchmove', handleTouchMove);
+        };
+    }, [isTouchDevice, startLongPress, clearLongPress, reactFlowInstance]);
+
+    // Build action sheet items (reuses same logic as context menu)
+    const buildActionSheetItems = useCallback((): MenuItem[] => {
+        if (!actionSheet || !activeGraphId) return [];
+
+        if (actionSheet.edgeId) {
+            return [{
+                label: 'Remove Dependency',
+                icon: <Trash2 className="w-4 h-4" />,
+                danger: true,
+                onClick: () => removeEdge(actionSheet.edgeId!),
+            }];
+        }
+
+        if (actionSheet.nodeId) {
+            const node = graph?.nodes.find(n => n.id === actionSheet.nodeId);
+            const items: MenuItem[] = [];
+
+            if (node?.type === 'action') {
+                items.push({
+                    label: 'Set Status',
+                    submenu: [
+                        { label: 'Todo', icon: <Circle className="w-4 h-4" />, onClick: () => updateNode(actionSheet.nodeId!, { status: 'todo' }) },
+                        { label: 'In Progress', icon: <Clock className="w-4 h-4" />, onClick: () => updateNode(actionSheet.nodeId!, { status: 'in_progress' }) },
+                        { label: 'Done', icon: <CheckCircle2 className="w-4 h-4" />, onClick: () => updateNode(actionSheet.nodeId!, { status: 'done' }) },
+                    ],
+                    onClick: () => {},
+                });
+            }
+
+            items.push({
+                label: 'Delete',
+                icon: <Trash2 className="w-4 h-4" />,
+                danger: true,
+                onClick: () => {
+                    if (node?.type === 'container') {
+                        const nodeId = actionSheet.nodeId!;
+                        setConfirmAction({
+                            title: 'Delete Container',
+                            message: 'Delete this container and all its children?',
+                            onConfirm: () => removeNode(nodeId),
+                        });
+                        return;
+                    }
+                    removeNode(actionSheet.nodeId!);
+                },
+            });
+            return items;
+        }
+
+        // Pane action sheet
+        return [
+            {
+                label: 'New Action Node',
+                icon: <Plus className="w-4 h-4" />,
+                onClick: () => {
+                    addNode({
+                        id: uuidv4(),
+                        graphId: activeGraphId,
+                        type: 'action',
+                        title: 'New Task',
+                        x: actionSheet.flowX ?? 0,
+                        y: actionSheet.flowY ?? 0,
+                        width: 200,
+                        height: 50,
+                        status: 'todo',
+                    });
+                },
+            },
+            {
+                label: 'New Container',
+                icon: <Layers className="w-4 h-4" />,
+                onClick: () => {
+                    addNode({
+                        id: uuidv4(),
+                        graphId: activeGraphId,
+                        type: 'container',
+                        title: 'New Group',
+                        x: actionSheet.flowX ?? 0,
+                        y: actionSheet.flowY ?? 0,
+                        width: 200,
+                        height: 80,
+                    });
+                },
+            },
+        ];
+    }, [actionSheet, activeGraphId, graph, removeEdge, removeNode, updateNode, addNode]);
+
     const buildContextMenuItems = useCallback((): MenuItem[] => {
         if (!contextMenu || !activeGraphId) return [];
 
@@ -327,7 +500,7 @@ const CanvasInner: React.FC = () => {
                 nodeTypes={nodeTypes as any}
                 onNodesChange={onNodesChange}
                 onConnect={onConnect}
-                onPaneClick={() => { setQuickAdd(null); setContextMenu(null); }}
+                onPaneClick={() => { setQuickAdd(null); setContextMenu(null); setActionSheet(null); }}
                 onDoubleClick={handlePaneDoubleClick}
                 onNodeContextMenu={handleNodeContextMenu}
                 onEdgeContextMenu={handleEdgeContextMenu}
@@ -379,6 +552,14 @@ const CanvasInner: React.FC = () => {
                         onBlur={() => setQuickAdd(null)}
                     />
                 </div>
+            )}
+
+            {/* Action sheet for long-press on touch */}
+            {actionSheet && (
+                <ActionSheet
+                    items={buildActionSheetItems()}
+                    onClose={() => setActionSheet(null)}
+                />
             )}
 
             {/* Custom confirmation modal (replaces window.confirm) */}
