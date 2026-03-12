@@ -13,6 +13,7 @@ interface WorkspaceState extends Workspace {
     selectMode: boolean;
     _hasSelection: boolean;
     connectMode: { active: boolean; sourceNodeId?: string };
+    sidebarOpen: boolean;
 
     // Actions
     resetWorkspace: (seed?: string) => void;
@@ -21,6 +22,8 @@ interface WorkspaceState extends Workspace {
     toggleConnectMode: () => void;
     setConnectSource: (nodeId: string) => void;
     clearConnectMode: () => void;
+    toggleSidebar: () => void;
+    closeSidebar: () => void;
     loadProject: (projectId: string) => void;
     enterGraph: (graphId: string, nodeId: string, nodeLabel: string) => void;
     navigateBack: (steps?: number) => void;
@@ -63,6 +66,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             selectMode: false,
             _hasSelection: false,
             connectMode: { active: false },
+            sidebarOpen: false,
 
             toggleSelectMode: () => {
                 set(state => ({ selectMode: !state.selectMode }));
@@ -86,6 +90,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             clearConnectMode: () => {
                 set({ connectMode: { active: false } });
+            },
+
+            toggleSidebar: () => {
+                set(state => ({ sidebarOpen: !state.sidebarOpen }));
+            },
+
+            closeSidebar: () => {
+                set({ sidebarOpen: false });
             },
 
             resetWorkspace: (seed = '42') => {
@@ -421,7 +433,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             storage: createJSONStorage(() => localStorage),
             partialize: (state) => {
                 // Exclude transient flags and actions from localStorage
-                const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, connectMode, ...rest } = state;
+                const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, connectMode, sidebarOpen, ...rest } = state;
                 return rest;
             },
             onRehydrateStorage: () => {

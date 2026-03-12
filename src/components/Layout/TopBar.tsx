@@ -1,6 +1,6 @@
 import React from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { ChevronRight, Home, PlayCircle, StopCircle, Undo2, Redo2, Trash2, BoxSelect, Link } from 'lucide-react';
+import { ChevronRight, Home, PlayCircle, StopCircle, Undo2, Redo2, Trash2, BoxSelect, Link, Menu } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useStore } from 'zustand';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
@@ -16,12 +16,23 @@ export const TopBar: React.FC = () => {
     const hasSelection = useWorkspaceStore(state => state._hasSelection);
     const connectMode = useWorkspaceStore(state => state.connectMode);
     const toggleConnectMode = useWorkspaceStore(state => state.toggleConnectMode);
+    const toggleSidebar = useWorkspaceStore(state => state.toggleSidebar);
 
     const { undo, redo, pastStates, futureStates } = useStore(useWorkspaceStore.temporal);
 
     return (
         <div className="h-14 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4">
             <div className="flex items-center text-sm overflow-hidden">
+                {/* Mobile hamburger menu */}
+                {isTouchDevice && (
+                    <button
+                        onClick={toggleSidebar}
+                        className="p-2 mr-1 rounded text-gray-400 hover:text-white hover:bg-gray-700 transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
+                        title="Toggle sidebar"
+                    >
+                        <Menu className="w-5 h-5" />
+                    </button>
+                )}
                 {navStack.map((item, index) => (
                     <React.Fragment key={index}>
                         {index > 0 && <ChevronRight className="w-4 h-4 text-gray-600 mx-1 flex-shrink-0" />}

@@ -5,8 +5,12 @@ import { useToastStore } from '../UI/Toast';
 import { supabase } from '../../lib/supabase';
 import { clsx } from 'clsx';
 import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus } from 'lucide-react';
+import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
 export const Sidebar: React.FC = () => {
+    const { isMobile } = useDeviceDetect();
+    const sidebarOpen = useWorkspaceStore(state => state.sidebarOpen);
+    const closeSidebar = useWorkspaceStore(state => state.closeSidebar);
     const projects = useWorkspaceStore(state => state.projects);
     const activeProjectId = useWorkspaceStore(state => state.activeProjectId);
     const loadProject = useWorkspaceStore(state => state.loadProject);
@@ -62,8 +66,14 @@ export const Sidebar: React.FC = () => {
         addToast('API key removed.', 'info');
     };
 
-    return (
-        <div className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col h-full">
+    // On mobile, hide unless drawer is open
+    if (isMobile && !sidebarOpen) return null;
+
+    const sidebarContent = (
+        <div className={clsx(
+            "bg-gray-900 border-r border-gray-800 flex flex-col h-full",
+            isMobile ? "w-[80vw] max-w-[320px]" : "w-64"
+        )}>
             <div className="p-4 border-b border-gray-800 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <FolderGit2 className="w-5 h-5 text-purple-400" />
@@ -261,7 +271,7 @@ export const Sidebar: React.FC = () => {
                             {projects.map(project => (
                                 <button
                                     key={project.id}
-                                    onClick={() => loadProject(project.id)}
+                                    onClick={() => { loadProject(project.id); if (isMobile) closeSidebar(); }}
                                     className={clsx(
                                         "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
                                         activeProjectId === project.id
@@ -301,4 +311,22 @@ export const Sidebar: React.FC = () => {
             )}
         </div>
     );
+
+    if (isMobile) {
+        return (
+            <div className="fixed inset-0 z-[80] flex">
+                {/* Backdrop */}
+                <div
+                    className="absolute inset-0 bg-black/50"
+                    onClick={closeSidebar}
+                />
+                {/* Drawer */}
+                <div className="relative z-10 animate-slide-in-left">
+                    {sidebarContent}
+                </div>
+            </div>
+        );
+    }
+
+    return sidebarContent;
 };

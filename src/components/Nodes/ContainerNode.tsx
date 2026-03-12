@@ -98,7 +98,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
 
         try {
             const result = await magicExpand(
-                settings.geminiApiKey,
+                settings.geminiApiKey!,
                 data.title,
                 data.meta?.notes
             );
