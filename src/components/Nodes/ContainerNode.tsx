@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState } from 'react';
+import React, { memo, useMemo, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Node as SpatialNode, Graph, Edge } from '../../types';
 import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2 } from 'lucide-react';
@@ -35,6 +35,8 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
     const addToast = useToastStore(state => state.addToast);
 
     const [expanding, setExpanding] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [editValue, setEditValue] = useState(data.title);
 
     const progress = useMemo(() => {
         return getContainerProgress(data, { graphs } as any);
@@ -50,6 +52,19 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
 
     const hasApiKey = !!settings.geminiApiKey;
     const hasExistingChildren = !!(data.childGraphId && graphs[data.childGraphId]?.nodes.length > 0);
+
+    const saveTitle = useCallback(() => {
+        if (editValue.trim() && editValue.trim() !== data.title) {
+            updateNode(data.id, { title: editValue.trim() });
+        }
+        setEditing(false);
+    }, [editValue, data.title, data.id, updateNode]);
+
+    const handleTitleDoubleClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditing(true);
+        setEditValue(data.title);
+    }, [data.title]);
 
     const handleEnter = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -156,9 +171,28 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                 <div className="flex items-center justify-between border-b border-indigo-800 pb-2 mb-1">
                     <div className="flex items-center gap-2 overflow-hidden">
                         <Layers className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-                        <span className="font-bold text-sm text-indigo-100 truncate">
-                            {data.title}
-                        </span>
+                        {editing ? (
+                            <input
+                                className="bg-transparent border-b border-indigo-500 outline-none text-sm text-indigo-100 font-bold w-full"
+                                value={editValue}
+                                onChange={e => setEditValue(e.target.value)}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') saveTitle();
+                                    if (e.key === 'Escape') setEditing(false);
+                                }}
+                                onBlur={saveTitle}
+                                onMouseDown={e => e.stopPropagation()}
+                                onClick={e => e.stopPropagation()}
+                                autoFocus
+                            />
+                        ) : (
+                            <span
+                                className="font-bold text-sm text-indigo-100 truncate"
+                                onDoubleClick={handleTitleDoubleClick}
+                            >
+                                {data.title}
+                            </span>
+                        )}
                     </div>
                     {highlight && <ArrowBigRightDash className="w-4 h-4 text-amber-500 animate-pulse" />}
                 </div>

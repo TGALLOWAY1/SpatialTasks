@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Node } from '../../types';
 import { CheckCircle2, Circle, Clock, Lock, ArrowBigRightDash } from 'lucide-react';
@@ -19,6 +19,11 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
     const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
     const graphs = useWorkspaceStore(state => state.graphs);
     const executionMode = useWorkspaceStore(state => state.executionMode);
+    const cycleNodeStatus = useWorkspaceStore(state => state.cycleNodeStatus);
+    const updateNode = useWorkspaceStore(state => state.updateNode);
+
+    const [editing, setEditing] = useState(false);
+    const [editValue, setEditValue] = useState(data.title);
 
     const { isBlocked, isActionable } = useMemo(() => {
         if (!activeGraphId) return { isBlocked: false, isActionable: false };
@@ -32,6 +37,25 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
     const highlight = executionMode && isActionable;
     const dim = executionMode && !isActionable;
 
+    const handleStatusClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isBlocked) return;
+        cycleNodeStatus(data.id);
+    }, [isBlocked, cycleNodeStatus, data.id]);
+
+    const save = useCallback(() => {
+        if (editValue.trim() && editValue.trim() !== data.title) {
+            updateNode(data.id, { title: editValue.trim() });
+        }
+        setEditing(false);
+    }, [editValue, data.title, data.id, updateNode]);
+
+    const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditing(true);
+        setEditValue(data.title);
+    }, [data.title]);
+
     return (
         <div className={clsx(
             "px-4 py-2 rounded-lg shadow-lg border-2 w-[200px] transition-all relative",
@@ -44,15 +68,43 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
             <Handle type="target" position={Position.Left} className="w-3 h-3 bg-slate-400" />
 
             <div className="flex items-center gap-2">
-                <StatusIcon status={data.status} blocked={isBlocked} />
-                <span className={clsx(
-                    "font-medium text-sm text-slate-200 truncate",
-                    data.status === 'done' && "line-through text-slate-400",
-                    isBlocked && "text-slate-500",
-                    highlight && "text-amber-100 font-bold"
-                )}>
-                    {data.title}
-                </span>
+                <button
+                    onClick={handleStatusClick}
+                    className={clsx(
+                        "flex-shrink-0 hover:scale-125 transition-transform",
+                        !isBlocked && "cursor-pointer"
+                    )}
+                    title={isBlocked ? "Blocked" : "Click to cycle status"}
+                >
+                    <StatusIcon status={data.status} blocked={isBlocked} />
+                </button>
+                {editing ? (
+                    <input
+                        className="bg-transparent border-b border-slate-500 outline-none text-sm text-slate-200 w-full"
+                        value={editValue}
+                        onChange={e => setEditValue(e.target.value)}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter') save();
+                            if (e.key === 'Escape') setEditing(false);
+                        }}
+                        onBlur={save}
+                        onMouseDown={e => e.stopPropagation()}
+                        onClick={e => e.stopPropagation()}
+                        autoFocus
+                    />
+                ) : (
+                    <span
+                        className={clsx(
+                            "font-medium text-sm text-slate-200 truncate",
+                            data.status === 'done' && "line-through text-slate-400",
+                            isBlocked && "text-slate-500",
+                            highlight && "text-amber-100 font-bold"
+                        )}
+                        onDoubleClick={handleDoubleClick}
+                    >
+                        {data.title}
+                    </span>
+                )}
             </div>
 
             {isBlocked && (

@@ -1,13 +1,16 @@
 import React from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { ChevronRight, Home, PlayCircle, StopCircle } from 'lucide-react';
+import { ChevronRight, Home, PlayCircle, StopCircle, Undo2, Redo2 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useStore } from 'zustand';
 
 export const TopBar: React.FC = () => {
     const navStack = useWorkspaceStore(state => state.navStack);
     const navigateToBreadcrumb = useWorkspaceStore(state => state.navigateToBreadcrumb);
     const executionMode = useWorkspaceStore(state => state.executionMode);
     const toggleExecutionMode = useWorkspaceStore(state => state.toggleExecutionMode);
+
+    const { undo, redo, pastStates, futureStates } = useStore(useWorkspaceStore.temporal);
 
     return (
         <div className="h-14 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4">
@@ -27,6 +30,24 @@ export const TopBar: React.FC = () => {
                 ))}
             </div>
 
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => undo()}
+                    disabled={pastStates.length === 0}
+                    className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Undo (Ctrl+Z)"
+                >
+                    <Undo2 className="w-4 h-4" />
+                </button>
+                <button
+                    onClick={() => redo()}
+                    disabled={futureStates.length === 0}
+                    className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Redo (Ctrl+Shift+Z)"
+                >
+                    <Redo2 className="w-4 h-4" />
+                </button>
+
             <button
                 onClick={toggleExecutionMode}
                 className={clsx(
@@ -39,6 +60,7 @@ export const TopBar: React.FC = () => {
                 {executionMode ? <StopCircle className="w-4 h-4 fill-current" /> : <PlayCircle className="w-4 h-4" />}
                 {executionMode ? "Execution Mode" : "Plan Mode"}
             </button>
+            </div>
         </div>
     );
 };
