@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useAuthStore } from '../../store/authStore';
 import { useToastStore } from '../UI/Toast';
+import { supabase } from '../../lib/supabase';
 import { clsx } from 'clsx';
-import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink } from 'lucide-react';
+import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
     const projects = useWorkspaceStore(state => state.projects);
@@ -12,10 +14,13 @@ export const Sidebar: React.FC = () => {
     const settings = useWorkspaceStore(state => state.settings);
     const updateSettings = useWorkspaceStore(state => state.updateSettings);
     const addToast = useToastStore(state => state.addToast);
+    const user = useAuthStore(state => state.user);
 
     const [showSettings, setShowSettings] = useState(false);
     const [showKey, setShowKey] = useState(false);
     const [keyInput, setKeyInput] = useState(settings.geminiApiKey || '');
+    const [newPassword, setNewPassword] = useState('');
+    const [changingPassword, setChangingPassword] = useState(false);
 
     const geminiStatus = settings.geminiStatus || (settings.geminiApiKey ? 'configured' : 'no_key');
 
@@ -27,6 +32,24 @@ export const Sidebar: React.FC = () => {
         } else {
             updateSettings({ geminiApiKey: undefined, geminiStatus: 'no_key' });
             addToast('API key cleared.', 'info');
+        }
+    };
+
+    const handleChangePassword = async () => {
+        if (newPassword.length < 6) {
+            addToast('Password must be at least 6 characters.', 'error');
+            return;
+        }
+        setChangingPassword(true);
+        try {
+            const { error } = await supabase.auth.updateUser({ password: newPassword });
+            if (error) throw error;
+            addToast('Password updated.', 'success');
+            setNewPassword('');
+        } catch (err: any) {
+            addToast(err.message || 'Failed to update password.', 'error');
+        } finally {
+            setChangingPassword(false);
         }
     };
 
@@ -154,8 +177,37 @@ export const Sidebar: React.FC = () => {
                             Once saved, container nodes will show a <span className="text-purple-400">sparkle</span> button to auto-generate subtasks with Gemini AI.
                         </p>
                         <p className="text-[10px] text-gray-600 leading-relaxed">
-                            Your key is stored locally in this browser only and is sent only to Google's Gemini API.
+                            Your key is stored locally in this browser only and never sent to our servers. It is sent only to Google's Gemini API.
                         </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-gray-800">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                            Change Password
+                        </h3>
+                        <div className="relative mb-2">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+                            <input
+                                type="password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="New password (min 6 chars)"
+                                minLength={6}
+                                className="w-full bg-gray-800 border border-gray-700 rounded-md pl-9 pr-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500"
+                            />
+                        </div>
+                        <button
+                            onClick={handleChangePassword}
+                            disabled={!newPassword.trim() || newPassword.length < 6 || changingPassword}
+                            className={clsx(
+                                "w-full px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                                newPassword.trim() && newPassword.length >= 6 && !changingPassword
+                                    ? "bg-purple-600 hover:bg-purple-500 text-white"
+                                    : "bg-gray-800 text-gray-600 cursor-not-allowed"
+                            )}
+                        >
+                            {changingPassword ? 'Updating...' : 'Update Password'}
+                        </button>
                     </div>
                 </div>
             ) : (
@@ -180,13 +232,26 @@ export const Sidebar: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="p-4 border-t border-gray-800">
+                    <div className="p-4 border-t border-gray-800 space-y-1">
+                        {user && (
+                            <div className="flex items-center gap-2 text-xs text-gray-400 px-2 py-1">
+                                <User className="w-3 h-3 shrink-0" />
+                                <span className="truncate">{user.email}</span>
+                            </div>
+                        )}
                         <button
                             onClick={() => resetWorkspace(Math.random().toString())}
                             className="flex items-center gap-2 text-xs text-gray-500 hover:text-white w-full px-2 py-2"
                         >
                             <RefreshCw className="w-3 h-3" />
                             Regenerate Data
+                        </button>
+                        <button
+                            onClick={() => supabase.auth.signOut()}
+                            className="flex items-center gap-2 text-xs text-gray-500 hover:text-red-400 w-full px-2 py-2"
+                        >
+                            <LogOut className="w-3 h-3" />
+                            Sign Out
                         </button>
                     </div>
                 </>
