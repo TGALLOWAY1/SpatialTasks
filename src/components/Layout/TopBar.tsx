@@ -48,22 +48,24 @@ export const TopBar: React.FC = () => {
                 ))}
             </div>
 
-            <div className="flex items-center gap-1 touch:gap-0.5">
+            <div className="flex items-center gap-1 touch:gap-0">
                 <button
                     onClick={() => undo()}
                     disabled={pastStates.length === 0}
-                    className="p-1.5 touch:p-2.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
+                    className="p-1.5 touch:px-2 touch:py-1 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors touch:min-h-[44px] touch:flex touch:flex-col touch:items-center touch:justify-center"
                     title="Undo (Ctrl+Z)"
                 >
                     <Undo2 className="w-4 h-4" />
+                    {isTouchDevice && <span className="text-[9px] leading-tight mt-0.5">Undo</span>}
                 </button>
                 <button
                     onClick={() => redo()}
                     disabled={futureStates.length === 0}
-                    className="p-1.5 touch:p-2.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
+                    className="p-1.5 touch:px-2 touch:py-1 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors touch:min-h-[44px] touch:flex touch:flex-col touch:items-center touch:justify-center"
                     title="Redo (Ctrl+Shift+Z)"
                 >
                     <Redo2 className="w-4 h-4" />
+                    {isTouchDevice && <span className="text-[9px] leading-tight mt-0.5">Redo</span>}
                 </button>
 
                 {/* Mobile-only: Delete selected */}
@@ -71,10 +73,11 @@ export const TopBar: React.FC = () => {
                     <button
                         onClick={() => document.dispatchEvent(new CustomEvent('canvas:delete-selected'))}
                         disabled={!hasSelection}
-                        className="p-1.5 touch:p-2.5 rounded text-gray-400 hover:text-red-400 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
+                        className="px-2 py-1 rounded text-gray-400 hover:text-red-400 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors min-h-[44px] flex flex-col items-center justify-center"
                         title="Delete selected"
                     >
                         <Trash2 className="w-4 h-4" />
+                        <span className="text-[9px] leading-tight mt-0.5">Delete</span>
                     </button>
                 )}
 
@@ -83,7 +86,7 @@ export const TopBar: React.FC = () => {
                     <button
                         onClick={toggleSelectMode}
                         className={clsx(
-                            "p-1.5 touch:p-2.5 rounded transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center",
+                            "px-2 py-1 rounded transition-colors min-h-[44px] flex flex-col items-center justify-center",
                             selectMode
                                 ? "text-purple-400 bg-purple-500/20"
                                 : "text-gray-400 hover:text-white hover:bg-gray-700"
@@ -91,6 +94,7 @@ export const TopBar: React.FC = () => {
                         title={selectMode ? "Pan mode" : "Select mode"}
                     >
                         <BoxSelect className="w-4 h-4" />
+                        <span className="text-[9px] leading-tight mt-0.5">{selectMode ? 'Select' : 'Select'}</span>
                     </button>
                 )}
 
@@ -99,7 +103,7 @@ export const TopBar: React.FC = () => {
                     <button
                         onClick={toggleConnectMode}
                         className={clsx(
-                            "p-1.5 touch:p-2.5 rounded transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center",
+                            "px-2 py-1 rounded transition-colors min-h-[44px] flex flex-col items-center justify-center",
                             connectMode.active
                                 ? "text-purple-400 bg-purple-500/20"
                                 : "text-gray-400 hover:text-white hover:bg-gray-700"
@@ -107,20 +111,21 @@ export const TopBar: React.FC = () => {
                         title={connectMode.active ? "Cancel connect" : "Connect nodes"}
                     >
                         <Link className="w-4 h-4" />
+                        <span className="text-[9px] leading-tight mt-0.5">Link</span>
                     </button>
                 )}
 
                 <button
                     onClick={toggleExecutionMode}
                     className={clsx(
-                        "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold transition-all",
+                        "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold transition-all touch:flex-col touch:gap-0.5 touch:px-2 touch:py-1 touch:rounded-lg touch:text-xs",
                         executionMode
                             ? "bg-amber-500/20 text-amber-500 border border-amber-500/50 hover:bg-amber-500/30"
                             : "bg-gray-800 text-gray-400 border border-gray-700 hover:text-white hover:bg-gray-700"
                     )}
                 >
                     {executionMode ? <StopCircle className="w-4 h-4 fill-current" /> : <PlayCircle className="w-4 h-4" />}
-                    <span className="hidden touch:hidden sm:inline">{executionMode ? "Execution Mode" : "Plan Mode"}</span>
+                    <span className="hidden touch:inline touch:text-[9px] touch:leading-tight sm:inline sm:text-sm">{executionMode ? "Run" : "Plan"}</span>
                 </button>
             </div>
         </div>
