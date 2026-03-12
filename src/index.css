@@ -32,16 +32,31 @@ html, body, #root {
   padding: 6px;
 }
 
-.react-flow__controls-button:hover {
-  background: #374151;
+@media (hover: hover) {
+  .react-flow__controls-button:hover {
+    background: #374151;
+  }
+  .react-flow__controls-button:hover svg {
+    fill: #e5e7eb;
+  }
 }
 
 .react-flow__controls-button svg {
   fill: #9ca3af;
 }
 
-.react-flow__controls-button:hover svg {
-  fill: #e5e7eb;
+/* Touch: active states for visual feedback instead of hover */
+@media (hover: none) {
+  button:active {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
+  .react-flow__controls-button:active {
+    background: #374151;
+  }
+  .react-flow__controls-button:active svg {
+    fill: #e5e7eb;
+  }
 }
 
 /* Touch device: enlarge ReactFlow handles for finger-friendly tapping */

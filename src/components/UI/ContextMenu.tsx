@@ -91,7 +91,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
-                            if (!item.disabled && !item.submenu) {
+                            if (!item.disabled && item.submenu) {
+                                // Toggle submenu on click (needed for touch devices)
+                                setActiveSubmenu(activeSubmenu === i ? null : i);
+                            } else if (!item.disabled) {
                                 item.onClick();
                                 onClose();
                             }
