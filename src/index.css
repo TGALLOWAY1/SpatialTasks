@@ -83,6 +83,11 @@ html, body, #root {
     height: 36px;
     padding: 8px;
   }
+  /* Push controls above iPhone safe area / home indicator */
+  .react-flow__controls {
+    bottom: calc(12px + var(--sab, 0px)) !important;
+    left: 12px !important;
+  }
 }
 
 /* Performance: GPU layer promotion for smooth mobile panning */
