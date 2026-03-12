@@ -15,6 +15,7 @@ import { useWorkspaceStore } from '../../store/workspaceStore';
 import { ContainerNode } from '../Nodes/ContainerNode';
 import { ActionNode } from '../Nodes/ActionNode';
 import { ContextMenu, MenuItem } from '../UI/ContextMenu';
+import { ConfirmModal } from '../UI/ConfirmModal';
 import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers } from 'lucide-react';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
@@ -47,6 +48,13 @@ const CanvasInner: React.FC = () => {
         x: number; y: number;
         nodeId?: string; edgeId?: string;
         flowX?: number; flowY?: number;
+    } | null>(null);
+
+    // Custom confirmation modal state (replaces window.confirm)
+    const [confirmAction, setConfirmAction] = useState<{
+        title: string;
+        message: string;
+        onConfirm: () => void;
     } | null>(null);
 
     const graph = activeGraphId ? graphs[activeGraphId] : null;
@@ -143,13 +151,17 @@ const CanvasInner: React.FC = () => {
             selectedEdges.forEach(edge => removeEdge(edge.id));
 
             if (selectedNodes.length > 0) {
+                const nodeIds = selectedNodes.map(n => n.id);
                 const hasContainers = selectedNodes.some(n => n.type === 'container');
                 if (hasContainers) {
-                    if (!window.confirm(`Delete ${selectedNodes.length} node(s)? Container nodes and their children will be removed.`)) {
-                        return;
-                    }
+                    setConfirmAction({
+                        title: 'Delete Nodes',
+                        message: `Delete ${selectedNodes.length} node(s)? Container nodes and their children will be removed.`,
+                        onConfirm: () => removeNodes(nodeIds),
+                    });
+                    return;
                 }
-                removeNodes(selectedNodes.map(n => n.id));
+                removeNodes(nodeIds);
             }
         };
 
@@ -224,9 +236,11 @@ const CanvasInner: React.FC = () => {
                         icon: <Trash2 className="w-4 h-4" />,
                         danger: true,
                         onClick: () => {
-                            if (window.confirm(`Delete ${selectedNodes.length} nodes?`)) {
-                                removeNodes(nodeIds);
-                            }
+                            setConfirmAction({
+                                title: 'Delete Nodes',
+                                message: `Delete ${selectedNodes.length} nodes?`,
+                                onConfirm: () => removeNodes(nodeIds),
+                            });
                         },
                     },
                 ];
@@ -251,7 +265,13 @@ const CanvasInner: React.FC = () => {
                 shortcut: 'Del',
                 onClick: () => {
                     if (node?.type === 'container') {
-                        if (!window.confirm('Delete this container and all its children?')) return;
+                        const nodeId = contextMenu.nodeId!;
+                        setConfirmAction({
+                            title: 'Delete Container',
+                            message: 'Delete this container and all its children?',
+                            onConfirm: () => removeNode(nodeId),
+                        });
+                        return;
                     }
                     removeNode(contextMenu.nodeId!);
                 },
@@ -359,6 +379,21 @@ const CanvasInner: React.FC = () => {
                         onBlur={() => setQuickAdd(null)}
                     />
                 </div>
+            )}
+
+            {/* Custom confirmation modal (replaces window.confirm) */}
+            {confirmAction && (
+                <ConfirmModal
+                    title={confirmAction.title}
+                    message={confirmAction.message}
+                    confirmLabel="Delete"
+                    danger
+                    onConfirm={() => {
+                        confirmAction.onConfirm();
+                        setConfirmAction(null);
+                    }}
+                    onCancel={() => setConfirmAction(null)}
+                />
             )}
         </div>
     );

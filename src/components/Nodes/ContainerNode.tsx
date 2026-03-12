@@ -8,6 +8,7 @@ import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useToastStore } from '../UI/Toast';
 import { getContainerProgress, isNodeBlocked } from '../../utils/logic';
 import { magicExpand, GeminiError } from '../../services/gemini';
+import { ConfirmModal } from '../UI/ConfirmModal';
 
 const WIDTH = 200;
 const HEIGHT = 80;
@@ -37,6 +38,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
     const [expanding, setExpanding] = useState(false);
     const [editing, setEditing] = useState(false);
     const [editValue, setEditValue] = useState(data.title);
+    const [showExpandConfirm, setShowExpandConfirm] = useState(false);
 
     const progress = useMemo(() => {
         return getContainerProgress(data, { graphs } as any);
@@ -89,16 +91,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
         }
     };
 
-    const handleMagicExpand = async (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (!settings.geminiApiKey) return;
-
-        if (hasExistingChildren) {
-            if (!window.confirm('This container already has subtasks. Replace them with AI-generated ones?')) {
-                return;
-            }
-        }
-
+    const doMagicExpand = async () => {
         setExpanding(true);
 
         try {
@@ -172,6 +165,18 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
         } finally {
             setExpanding(false);
         }
+    };
+
+    const handleMagicExpand = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!settings.geminiApiKey) return;
+
+        if (hasExistingChildren) {
+            setShowExpandConfirm(true);
+            return;
+        }
+
+        doMagicExpand();
     };
 
     return (
@@ -254,6 +259,20 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
             </div>
 
             <Handle type="source" position={Position.Right} className="w-3 h-3 bg-indigo-400" />
+
+            {showExpandConfirm && (
+                <ConfirmModal
+                    title="Replace Subtasks"
+                    message="This container already has subtasks. Replace them with AI-generated ones?"
+                    confirmLabel="Replace"
+                    danger
+                    onConfirm={() => {
+                        setShowExpandConfirm(false);
+                        doMagicExpand();
+                    }}
+                    onCancel={() => setShowExpandConfirm(false)}
+                />
+            )}
         </div>
     );
 });
