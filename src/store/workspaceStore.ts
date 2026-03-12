@@ -2,8 +2,13 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Workspace, Node, Graph, Edge, WorkspaceSettings } from '../types';
 import { generateWorkspace } from '../utils/generator';
+import { saveGeminiConfig, loadGeminiConfig } from '../lib/workspaceSync';
 
 interface WorkspaceState extends Workspace {
+    // Transient flags (not persisted)
+    _hydrated: boolean;
+    _supabaseLoaded: boolean;
+
     // Actions
     resetWorkspace: (seed?: string) => void;
     loadProject: (projectId: string) => void;
@@ -21,6 +26,10 @@ interface WorkspaceState extends Workspace {
     onNodesChange: (changes: any[]) => void; // ReactFlow hook
     onEdgesChange: (changes: any[]) => void; // ReactFlow hook
     jsonImport: (json: string) => void;
+
+    // Supabase sync
+    hydrateFromSupabase: (data: Workspace) => void;
+    setSupabaseLoaded: (loaded: boolean) => void;
 }
 
 const STORAGE_KEY = 'spatialtasks-workspace';
@@ -30,6 +39,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         (set, get) => ({
             // Initial State (overridden by hydrate if exists, or generator)
             ...generateWorkspace('42'),
+            _hydrated: false,
+            _supabaseLoaded: false,
 
             resetWorkspace: (seed = '42') => {
                 set(generateWorkspace(seed));
@@ -141,15 +152,22 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             updateSettings: (newSettings) => {
                 const { settings } = get();
-                set({
-                    settings: { ...settings, ...newSettings }
-                });
+                const merged = { ...settings, ...newSettings };
+                set({ settings: merged });
+
+                // Persist Gemini keys to localStorage separately (never sent to Supabase)
+                if ('geminiApiKey' in newSettings || 'geminiStatus' in newSettings) {
+                    saveGeminiConfig({
+                        geminiApiKey: merged.geminiApiKey,
+                        geminiStatus: merged.geminiStatus,
+                    });
+                }
             },
 
             // Placeholders for RF hooks component integration
             onNodesChange: () => {
                 // This logic is usually handled inside the component with applyNodeChanges from RF
-                // But we need to sync it to our store. 
+                // But we need to sync it to our store.
                 // For now, we'll let the component handle the RF specific logic and call updateNode/setNodes
             },
 
@@ -158,16 +176,49 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             jsonImport: (json) => {
                 try {
                     const data = JSON.parse(json);
-                    // TODO: Validate
-                    set(data);
+                    if (typeof data !== 'object' || !data) throw new Error('Invalid JSON');
+                    if (!Array.isArray(data.projects)) throw new Error('Missing projects');
+                    if (typeof data.graphs !== 'object') throw new Error('Missing graphs');
+                    if (typeof data.version !== 'number') throw new Error('Missing version');
+                    // Sanitize: strip any prototype pollution
+                    const clean = JSON.parse(JSON.stringify(data));
+                    set(clean);
                 } catch (e) {
                     console.error("Failed to import", e);
                 }
-            }
+            },
+
+            // Supabase sync actions
+            hydrateFromSupabase: (data) => {
+                const geminiConfig = loadGeminiConfig();
+                set({
+                    ...data,
+                    settings: {
+                        ...data.settings,
+                        geminiApiKey: geminiConfig.geminiApiKey,
+                        geminiStatus: geminiConfig.geminiStatus,
+                    },
+                    _supabaseLoaded: true,
+                });
+            },
+
+            setSupabaseLoaded: (loaded) => {
+                set({ _supabaseLoaded: loaded });
+            },
         }),
         {
             name: STORAGE_KEY,
             storage: createJSONStorage(() => localStorage),
+            partialize: (state) => {
+                // Exclude transient flags and actions from localStorage
+                const { _hydrated, _supabaseLoaded, ...rest } = state;
+                return rest;
+            },
+            onRehydrateStorage: () => {
+                return (state) => {
+                    if (state) state._hydrated = true;
+                };
+            },
         }
     )
 );
