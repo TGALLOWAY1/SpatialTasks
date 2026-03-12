@@ -1,7 +1,7 @@
 import React, { memo, useMemo, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Node as SpatialNode, Graph, Edge } from '../../types';
-import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2 } from 'lucide-react';
+import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2, Pencil } from 'lucide-react';
 import { clsx } from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
 import { useWorkspaceStore } from '../../store/workspaceStore';
@@ -9,6 +9,7 @@ import { useToastStore } from '../UI/Toast';
 import { getContainerProgress, isNodeBlocked } from '../../utils/logic';
 import { magicExpand, GeminiError } from '../../services/gemini';
 import { ConfirmModal } from '../UI/ConfirmModal';
+import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
 const WIDTH = 200;
 const HEIGHT = 80;
@@ -25,6 +26,7 @@ const ProgressRing = ({ progress }: { progress: number }) => {
 };
 
 export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) => {
+    const { isTouchDevice } = useDeviceDetect();
     const enterGraph = useWorkspaceStore(state => state.enterGraph);
     const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
     const graphs = useWorkspaceStore(state => state.graphs);
@@ -248,6 +250,21 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                 <div className="absolute -top-3 -right-2 bg-amber-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full animate-bounce shadow-lg z-20">
                     Dive In
                 </div>
+            )}
+
+            {/* Touch: floating Edit Title button when selected */}
+            {selected && isTouchDevice && !editing && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setEditing(true);
+                        setEditValue(data.title);
+                    }}
+                    className="absolute -top-10 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 min-h-[32px] active:bg-indigo-500 z-20"
+                >
+                    <Pencil className="w-3 h-3" />
+                    Edit Title
+                </button>
             )}
 
             {/* Progress bar visual at bottom */}

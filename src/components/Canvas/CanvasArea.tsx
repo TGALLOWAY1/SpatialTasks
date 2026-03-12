@@ -17,6 +17,7 @@ import { ActionNode } from '../Nodes/ActionNode';
 import { ContextMenu, MenuItem } from '../UI/ContextMenu';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { ActionSheet } from '../UI/ActionSheet';
+import { FloatingActionButton } from '../UI/FloatingActionButton';
 import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers } from 'lucide-react';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
@@ -490,6 +491,25 @@ const CanvasInner: React.FC = () => {
         ];
     }, [contextMenu, activeGraphId, graph, reactFlowInstance, removeEdge, removeNode, removeNodes, updateNode, batchUpdateNodes, addNode]);
 
+    // FAB quick-add: place node at center of viewport
+    const handleFabAdd = useCallback((title: string) => {
+        if (!activeGraphId) return;
+        const viewport = reactFlowInstance.getViewport();
+        const centerX = (window.innerWidth / 2 - viewport.x) / viewport.zoom;
+        const centerY = (window.innerHeight / 2 - viewport.y) / viewport.zoom;
+        addNode({
+            id: uuidv4(),
+            graphId: activeGraphId,
+            type: 'action',
+            title,
+            x: centerX - 100,
+            y: centerY - 25,
+            width: 200,
+            height: 50,
+            status: 'todo',
+        });
+    }, [activeGraphId, reactFlowInstance, addNode]);
+
     if (!graph) return <div className="text-gray-500 flex items-center justify-center h-full">No graph selected</div>;
 
     return (
@@ -501,7 +521,7 @@ const CanvasInner: React.FC = () => {
                 onNodesChange={onNodesChange}
                 onConnect={onConnect}
                 onPaneClick={() => { setQuickAdd(null); setContextMenu(null); setActionSheet(null); }}
-                onDoubleClick={handlePaneDoubleClick}
+                onDoubleClick={isTouchDevice ? undefined : handlePaneDoubleClick}
                 onNodeContextMenu={handleNodeContextMenu}
                 onEdgeContextMenu={handleEdgeContextMenu}
                 onPaneContextMenu={handlePaneContextMenu}
@@ -525,7 +545,10 @@ const CanvasInner: React.FC = () => {
                 />
             )}
 
-            {/* Quick-add input on double-click */}
+            {/* FAB for quick-add on touch devices */}
+            {isTouchDevice && <FloatingActionButton onSubmit={handleFabAdd} />}
+
+            {/* Quick-add input on double-click (desktop only) */}
             {quickAdd && (
                 <div className="fixed z-50" style={{ left: quickAdd.screenX, top: quickAdd.screenY }}>
                     <input

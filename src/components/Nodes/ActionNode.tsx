@@ -1,10 +1,11 @@
 import { memo, useMemo, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Node } from '../../types';
-import { CheckCircle2, Circle, Clock, Lock, ArrowBigRightDash } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Lock, ArrowBigRightDash, Pencil } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { isNodeBlocked, isNodeActionable } from '../../utils/logic';
+import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
 const StatusIcon = ({ status, blocked }: { status?: string, blocked?: boolean }) => {
     if (blocked) return <Lock className="w-4 h-4 text-gray-500" />;
@@ -16,6 +17,7 @@ const StatusIcon = ({ status, blocked }: { status?: string, blocked?: boolean })
 };
 
 export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
+    const { isTouchDevice } = useDeviceDetect();
     const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
     const graphs = useWorkspaceStore(state => state.graphs);
     const executionMode = useWorkspaceStore(state => state.executionMode);
@@ -106,6 +108,21 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                     </span>
                 )}
             </div>
+
+            {/* Touch: floating Edit button when selected */}
+            {selected && isTouchDevice && !editing && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setEditing(true);
+                        setEditValue(data.title);
+                    }}
+                    className="absolute -top-10 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 min-h-[32px] active:bg-purple-500 z-20"
+                >
+                    <Pencil className="w-3 h-3" />
+                    Edit
+                </button>
+            )}
 
             {isBlocked && (
                 <div className="absolute -top-2 -right-2 bg-red-900/80 text-red-200 text-[10px] px-1.5 py-0.5 rounded-full border border-red-800">
