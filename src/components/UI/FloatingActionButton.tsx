@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useKeyboardOffset } from '../../hooks/useKeyboardOffset';
 
 interface FloatingActionButtonProps {
     onSubmit: (title: string) => void;
@@ -10,6 +11,7 @@ export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onSu
     const [isOpen, setIsOpen] = useState(false);
     const [value, setValue] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
+    const keyboardOffset = useKeyboardOffset();
 
     useEffect(() => {
         if (isOpen) {
@@ -33,8 +35,8 @@ export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onSu
                 <div className="fixed inset-0 z-[90]" onClick={() => setIsOpen(false)}>
                     <div className="absolute inset-0 bg-black/40" />
                     <div
-                        className="absolute bottom-0 left-0 right-0 bg-slate-800 rounded-t-2xl shadow-2xl p-4"
-                        style={{ paddingBottom: 'calc(16px + var(--sab, 0px))' }}
+                        className="absolute left-0 right-0 bg-slate-800 rounded-t-2xl shadow-2xl p-4 transition-[bottom] duration-100"
+                        style={{ bottom: keyboardOffset, paddingBottom: 'calc(16px + var(--sab, 0px))' }}
                         onClick={e => e.stopPropagation()}
                     >
                         <div className="flex items-center gap-3">
