@@ -1,0 +1,373 @@
+import React, { useMemo, useState, useCallback } from 'react';
+import { useWorkspaceStore } from '../../store/workspaceStore';
+import { Node } from '../../types';
+import { isNodeBlocked } from '../../utils/logic';
+import {
+    CheckCircle2, Circle, Clock, Lock, Layers, ArrowRightCircle,
+    Pencil, Sparkles, Loader2,
+} from 'lucide-react';
+import { clsx } from 'clsx';
+import { getContainerProgress } from '../../utils/logic';
+import { v4 as uuidv4 } from 'uuid';
+import { magicExpand, GeminiError } from '../../services/gemini';
+import { useToastStore } from '../UI/Toast';
+import { ConfirmModal } from '../UI/ConfirmModal';
+import { Graph } from '../../types';
+
+const StatusIcon = ({ status, blocked, size = 'sm' }: { status?: string; blocked?: boolean; size?: 'sm' | 'md' }) => {
+    const cls = size === 'md' ? 'w-5 h-5' : 'w-4 h-4';
+    if (blocked) return <Lock className={clsx(cls, 'text-gray-500')} />;
+    switch (status) {
+        case 'done': return <CheckCircle2 className={clsx(cls, 'text-green-400')} />;
+        case 'in_progress': return <Clock className={clsx(cls, 'text-blue-400')} />;
+        default: return <Circle className={clsx(cls, 'text-gray-500')} />;
+    }
+};
+
+const ActionItem: React.FC<{ node: Node; blocked: boolean }> = ({ node, blocked }) => {
+    const cycleNodeStatus = useWorkspaceStore(state => state.cycleNodeStatus);
+    const updateNode = useWorkspaceStore(state => state.updateNode);
+    const [editing, setEditing] = useState(false);
+    const [editValue, setEditValue] = useState(node.title);
+
+    const handleStatusClick = useCallback(() => {
+        if (blocked) return;
+        cycleNodeStatus(node.id);
+    }, [blocked, cycleNodeStatus, node.id]);
+
+    const save = useCallback(() => {
+        if (editValue.trim() && editValue.trim() !== node.title) {
+            updateNode(node.id, { title: editValue.trim() });
+        }
+        setEditing(false);
+    }, [editValue, node.title, node.id, updateNode]);
+
+    return (
+        <div
+            className={clsx(
+                'flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors',
+                blocked ? 'bg-slate-900/50 border-slate-800 opacity-70' : 'bg-slate-800/50 border-slate-700/50 hover:border-slate-600',
+                node.status === 'done' && 'opacity-60',
+            )}
+        >
+            <button
+                onClick={handleStatusClick}
+                className={clsx(
+                    'flex-shrink-0 transition-transform touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center',
+                    !blocked && 'hover:scale-110 cursor-pointer'
+                )}
+            >
+                <StatusIcon status={node.status} blocked={blocked} size="md" />
+            </button>
+
+            {editing ? (
+                <input
+                    className="bg-transparent border-b border-slate-500 outline-none text-sm text-slate-200 flex-1"
+                    value={editValue}
+                    onChange={e => setEditValue(e.target.value)}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter') save();
+                        if (e.key === 'Escape') setEditing(false);
+                    }}
+                    onBlur={save}
+                    autoFocus
+                />
+            ) : (
+                <span
+                    className={clsx(
+                        'text-sm text-slate-200 flex-1 cursor-text',
+                        node.status === 'done' && 'line-through text-slate-400',
+                        blocked && 'text-slate-500',
+                    )}
+                    onDoubleClick={() => { setEditing(true); setEditValue(node.title); }}
+                >
+                    {node.title}
+                </span>
+            )}
+
+            {blocked && (
+                <span className="text-[10px] text-red-300 bg-red-900/60 px-1.5 py-0.5 rounded-full border border-red-800/50 flex-shrink-0">
+                    Blocked
+                </span>
+            )}
+
+            {!editing && (
+                <button
+                    onClick={() => { setEditing(true); setEditValue(node.title); }}
+                    className="text-slate-500 hover:text-slate-300 transition-colors flex-shrink-0"
+                >
+                    <Pencil className="w-3.5 h-3.5" />
+                </button>
+            )}
+        </div>
+    );
+};
+
+const ContainerItem: React.FC<{ node: Node }> = ({ node }) => {
+    const enterGraph = useWorkspaceStore(state => state.enterGraph);
+    const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
+    const graphs = useWorkspaceStore(state => state.graphs);
+    const settings = useWorkspaceStore(state => state.settings);
+    const addGraph = useWorkspaceStore(state => state.addGraph);
+    const updateNode = useWorkspaceStore(state => state.updateNode);
+    const updateSettings = useWorkspaceStore(state => state.updateSettings);
+    const addToast = useToastStore(state => state.addToast);
+
+    const [expanding, setExpanding] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [editValue, setEditValue] = useState(node.title);
+    const [showExpandConfirm, setShowExpandConfirm] = useState(false);
+
+    const progress = useMemo(() => getContainerProgress(node, { graphs } as any), [node, graphs]);
+    const hasApiKey = !!settings.geminiApiKey;
+    const hasExistingChildren = !!(node.childGraphId && graphs[node.childGraphId]?.nodes.length > 0);
+    const percentage = Math.round(progress * 100);
+
+    const saveTitle = useCallback(() => {
+        if (editValue.trim() && editValue.trim() !== node.title) {
+            updateNode(node.id, { title: editValue.trim() });
+        }
+        setEditing(false);
+    }, [editValue, node.title, node.id, updateNode]);
+
+    const handleEnter = () => {
+        if (node.childGraphId) {
+            enterGraph(node.childGraphId, node.id, node.title);
+        } else {
+            const currentGraph = activeGraphId ? graphs[activeGraphId] : null;
+            const projectId = currentGraph?.projectId || '';
+            const childGraphId = uuidv4();
+            const childGraph: Graph = {
+                id: childGraphId, projectId, title: node.title,
+                nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 },
+            };
+            addGraph(childGraph);
+            updateNode(node.id, { childGraphId });
+            enterGraph(childGraphId, node.id, node.title);
+        }
+    };
+
+    const doMagicExpand = async () => {
+        setExpanding(true);
+        try {
+            const result = await magicExpand(settings.geminiApiKey!, node.title, node.meta?.notes);
+            const currentGraph = activeGraphId ? graphs[activeGraphId] : null;
+            const projectId = currentGraph?.projectId || '';
+            const childGraphId = uuidv4();
+            const childGraph: Graph = {
+                id: childGraphId, projectId, title: node.title,
+                nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 },
+            };
+            const idMap: Record<string, string> = {};
+            result.subtasks.forEach((subtask, index) => {
+                const nodeId = uuidv4();
+                idMap[subtask.id] = nodeId;
+                childGraph.nodes.push({
+                    id: nodeId, graphId: childGraphId, type: 'action', title: subtask.title,
+                    x: index * 250, y: (index % 2 === 0) ? 0 : 50, width: 200, height: 80, status: 'todo',
+                });
+            });
+            result.subtasks.forEach((subtask) => {
+                const targetId = idMap[subtask.id];
+                subtask.dependsOn.forEach((depSlug) => {
+                    const sourceId = idMap[depSlug];
+                    if (sourceId && targetId) {
+                        childGraph.edges.push({ id: uuidv4(), graphId: childGraphId, source: sourceId, target: targetId });
+                    }
+                });
+            });
+            addGraph(childGraph);
+            updateNode(node.id, { childGraphId });
+            enterGraph(childGraphId, node.id, node.title);
+            addToast(`Generated ${result.subtasks.length} subtasks for "${node.title}"`, 'success');
+        } catch (err) {
+            const geminiErr = err as GeminiError;
+            addToast(geminiErr.message || 'Magic Expand failed.', 'error');
+            if (geminiErr.type === 'invalid_key') updateSettings({ geminiStatus: 'error' });
+        } finally {
+            setExpanding(false);
+        }
+    };
+
+    const handleMagicExpand = () => {
+        if (!settings.geminiApiKey) return;
+        if (hasExistingChildren) { setShowExpandConfirm(true); return; }
+        doMagicExpand();
+    };
+
+    return (
+        <>
+            <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-indigo-950/50 border-indigo-800/50 hover:border-indigo-600/50 transition-colors">
+                <Layers className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+
+                <div className="flex-1 min-w-0">
+                    {editing ? (
+                        <input
+                            className="bg-transparent border-b border-indigo-500 outline-none text-sm text-indigo-100 font-bold w-full"
+                            value={editValue}
+                            onChange={e => setEditValue(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') saveTitle();
+                                if (e.key === 'Escape') setEditing(false);
+                            }}
+                            onBlur={saveTitle}
+                            autoFocus
+                        />
+                    ) : (
+                        <span
+                            className="font-bold text-sm text-indigo-100 block cursor-text"
+                            onDoubleClick={() => { setEditing(true); setEditValue(node.title); }}
+                        >
+                            {node.title}
+                        </span>
+                    )}
+                    <div className="flex items-center gap-2 mt-1">
+                        <div className="h-1.5 flex-1 bg-indigo-900 rounded-full overflow-hidden max-w-[120px]">
+                            <div
+                                className="h-full bg-indigo-400 transition-all duration-500"
+                                style={{ width: `${percentage}%` }}
+                            />
+                        </div>
+                        <span className="text-[10px] text-indigo-300">{percentage}%</span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-1 flex-shrink-0">
+                    {!editing && (
+                        <button
+                            onClick={() => { setEditing(true); setEditValue(node.title); }}
+                            className="text-indigo-400 hover:text-indigo-200 transition-colors p-1"
+                        >
+                            <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                    {hasApiKey && (
+                        <button
+                            onClick={handleMagicExpand}
+                            disabled={expanding}
+                            className="text-purple-300 hover:text-purple-100 transition-all p-1 disabled:opacity-50 touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
+                            title="Magic Expand"
+                        >
+                            {expanding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                        </button>
+                    )}
+                    <button
+                        onClick={handleEnter}
+                        className="text-indigo-200 hover:text-white transition-all p-1 touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
+                        title="Enter subgraph"
+                    >
+                        <ArrowRightCircle className="w-5 h-5" />
+                    </button>
+                </div>
+            </div>
+            {showExpandConfirm && (
+                <ConfirmModal
+                    title="Replace Subtasks"
+                    message="This container already has subtasks. Replace them with AI-generated ones?"
+                    confirmLabel="Replace"
+                    danger
+                    onConfirm={() => { setShowExpandConfirm(false); doMagicExpand(); }}
+                    onCancel={() => setShowExpandConfirm(false)}
+                />
+            )}
+        </>
+    );
+};
+
+export const ListView: React.FC = () => {
+    const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
+    const graphs = useWorkspaceStore(state => state.graphs);
+    const addNode = useWorkspaceStore(state => state.addNode);
+
+    const graph = activeGraphId ? graphs[activeGraphId] : null;
+
+    const [newTaskTitle, setNewTaskTitle] = useState('');
+
+    // Sort: containers first, then actions; within each group, keep original order
+    const sortedNodes = useMemo(() => {
+        if (!graph) return [];
+        const containers = graph.nodes.filter(n => n.type === 'container');
+        const actions = graph.nodes.filter(n => n.type === 'action');
+        return [...containers, ...actions];
+    }, [graph]);
+
+    const handleAddTask = useCallback(() => {
+        if (!newTaskTitle.trim() || !activeGraphId) return;
+        addNode({
+            id: uuidv4(),
+            graphId: activeGraphId,
+            type: 'action',
+            title: newTaskTitle.trim(),
+            x: Math.random() * 400,
+            y: Math.random() * 300,
+            width: 200,
+            height: 50,
+            status: 'todo',
+        });
+        setNewTaskTitle('');
+    }, [newTaskTitle, activeGraphId, addNode]);
+
+    if (!graph) {
+        return <div className="text-gray-500 flex items-center justify-center h-full">No graph selected</div>;
+    }
+
+    const doneCount = graph.nodes.filter(n => n.type === 'action' && n.status === 'done').length;
+    const totalActions = graph.nodes.filter(n => n.type === 'action').length;
+
+    return (
+        <div className="flex-1 h-full bg-gray-950 overflow-y-auto">
+            <div className="max-w-2xl mx-auto px-4 py-6 space-y-3">
+                {/* Summary header */}
+                {totalActions > 0 && (
+                    <div className="flex items-center justify-between px-2 pb-2 border-b border-gray-800">
+                        <span className="text-xs text-gray-400">
+                            {doneCount} of {totalActions} tasks complete
+                        </span>
+                        <div className="h-1.5 w-24 bg-gray-800 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-green-500 transition-all duration-500"
+                                style={{ width: `${totalActions > 0 ? (doneCount / totalActions) * 100 : 0}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Task list */}
+                {sortedNodes.map(node => {
+                    if (node.type === 'container') {
+                        return <ContainerItem key={node.id} node={node} />;
+                    }
+                    const blocked = graph ? isNodeBlocked(node, graph) : false;
+                    return <ActionItem key={node.id} node={node} blocked={blocked} />;
+                })}
+
+                {/* Quick add */}
+                <div className="flex items-center gap-2 pt-2">
+                    <input
+                        className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-purple-500 placeholder-slate-500"
+                        placeholder="Add a new task..."
+                        value={newTaskTitle}
+                        onChange={e => setNewTaskTitle(e.target.value)}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter') handleAddTask();
+                        }}
+                    />
+                    <button
+                        onClick={handleAddTask}
+                        disabled={!newTaskTitle.trim()}
+                        className="px-4 py-2.5 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors touch:min-h-[44px]"
+                    >
+                        Add
+                    </button>
+                </div>
+
+                {sortedNodes.length === 0 && (
+                    <div className="text-center text-gray-500 py-12">
+                        <p className="text-lg mb-2">No tasks yet</p>
+                        <p className="text-sm">Add a task above to get started</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};

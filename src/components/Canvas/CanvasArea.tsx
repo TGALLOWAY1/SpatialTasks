@@ -85,6 +85,7 @@ const CanvasInner: React.FC = () => {
             position: { x: n.x, y: n.y },
             data: { ...n, _isConnectSource: connectMode.sourceNodeId === n.id },
             draggable: !connectMode.active,
+            style: { width: n.width ?? 200 },
         }));
     }, [graph, connectMode]);
 

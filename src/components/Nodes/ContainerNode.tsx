@@ -1,7 +1,7 @@
 import React, { memo, useMemo, useState, useCallback } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { Handle, Position, NodeProps, NodeResizeControl } from 'reactflow';
 import { Node as SpatialNode, Graph, Edge } from '../../types';
-import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2, Pencil } from 'lucide-react';
+import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2, Pencil, GripVertical } from 'lucide-react';
 import { clsx } from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
 import { useWorkspaceStore } from '../../store/workspaceStore';
@@ -14,6 +14,8 @@ import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 const WIDTH = 200;
 const HEIGHT = 80;
 const PADDING_X = 50;
+const MIN_WIDTH = 160;
+const MAX_WIDTH = 500;
 
 const ProgressRing = ({ progress }: { progress: number }) => {
     const percentage = Math.round(progress * 100);
@@ -56,6 +58,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
 
     const hasApiKey = !!settings.geminiApiKey;
     const hasExistingChildren = !!(data.childGraphId && graphs[data.childGraphId]?.nodes.length > 0);
+    const nodeWidth = data.width ?? WIDTH;
 
     const saveTitle = useCallback(() => {
         if (editValue.trim() && editValue.trim() !== data.title) {
@@ -69,6 +72,10 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
         setEditing(true);
         setEditValue(data.title);
     }, [data.title]);
+
+    const handleResize = useCallback((_event: any, params: { width: number }) => {
+        updateNode(data.id, { width: Math.round(params.width) });
+    }, [data.id, updateNode]);
 
     const handleEnter = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -182,43 +189,70 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
     };
 
     return (
-        <div className={clsx(
-            "px-4 py-3 rounded-lg shadow-xl border-2 w-[200px] bg-indigo-950 transition-[transform,opacity,border-color,box-shadow] duration-200 group relative",
-            selected ? "border-indigo-400 shadow-indigo-500/30" : "border-indigo-800",
-            highlight && "ring-4 ring-amber-500/50 border-amber-500 shadow-amber-500/20 scale-105 z-10",
-            dim && "opacity-30 blur-[1px] grayscale",
-            (data as any)._isConnectSource && "ring-4 ring-purple-500 animate-pulse"
-        )}>
+        <div
+            className={clsx(
+                "px-4 py-3 rounded-lg shadow-xl border-2 bg-indigo-950 transition-[transform,opacity,border-color,box-shadow] duration-200 group relative",
+                selected ? "border-indigo-400 shadow-indigo-500/30" : "border-indigo-800",
+                highlight && "ring-4 ring-amber-500/50 border-amber-500 shadow-amber-500/20 scale-105 z-10",
+                dim && "opacity-30 blur-[1px] grayscale",
+                (data as any)._isConnectSource && "ring-4 ring-purple-500 animate-pulse"
+            )}
+            style={{ width: nodeWidth, minWidth: MIN_WIDTH, maxWidth: MAX_WIDTH }}
+        >
+            {/* Resize handle — right edge */}
+            <NodeResizeControl
+                minWidth={MIN_WIDTH}
+                maxWidth={MAX_WIDTH}
+                position="right"
+                onResize={handleResize}
+                style={{
+                    background: 'transparent',
+                    border: 'none',
+                    width: 12,
+                    height: '100%',
+                    right: -6,
+                    top: 0,
+                    cursor: 'ew-resize',
+                }}
+            >
+                {selected && (
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 text-indigo-400 opacity-60">
+                        <GripVertical className="w-3 h-3" />
+                    </div>
+                )}
+            </NodeResizeControl>
+
             <Handle type="target" position={Position.Left} className="w-3 h-3 bg-indigo-400" />
 
             <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between border-b border-indigo-800 pb-2 mb-1">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                        <Layers className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                <div className="flex items-start justify-between border-b border-indigo-800 pb-2 mb-1">
+                    <div className="flex items-start gap-2 overflow-hidden flex-1 min-w-0">
+                        <Layers className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
                         {editing ? (
-                            <input
-                                className="bg-transparent border-b border-indigo-500 outline-none text-sm text-indigo-100 font-bold w-full"
+                            <textarea
+                                className="bg-transparent border-b border-indigo-500 outline-none text-sm text-indigo-100 font-bold w-full resize-none"
                                 value={editValue}
                                 onChange={e => setEditValue(e.target.value)}
                                 onKeyDown={e => {
-                                    if (e.key === 'Enter') saveTitle();
+                                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveTitle(); }
                                     if (e.key === 'Escape') setEditing(false);
                                 }}
                                 onBlur={saveTitle}
                                 onMouseDown={e => e.stopPropagation()}
                                 onClick={e => e.stopPropagation()}
+                                rows={2}
                                 autoFocus
                             />
                         ) : (
                             <span
-                                className="font-bold text-sm text-indigo-100 truncate"
+                                className="font-bold text-sm text-indigo-100 break-words whitespace-pre-wrap"
                                 onDoubleClick={handleTitleDoubleClick}
                             >
                                 {data.title}
                             </span>
                         )}
                     </div>
-                    {highlight && <ArrowBigRightDash className="w-4 h-4 text-amber-500 animate-pulse" />}
+                    {highlight && <ArrowBigRightDash className="w-4 h-4 text-amber-500 animate-pulse flex-shrink-0" />}
                 </div>
 
                 <div className="flex justify-between items-center">
