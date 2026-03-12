@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Workspace, Node, Graph, Edge, WorkspaceSettings } from '../types';
+import { v4 as uuidv4 } from 'uuid';
+import { Workspace, Node, Graph, Edge, Project, WorkspaceSettings } from '../types';
 import { generateWorkspace } from '../utils/generator';
 import { saveGeminiConfig, loadGeminiConfig } from '../lib/workspaceSync';
 
@@ -16,6 +17,9 @@ interface WorkspaceState extends Workspace {
     navigateBack: (steps?: number) => void;
     navigateToBreadcrumb: (index: number) => void;
     toggleExecutionMode: () => void;
+
+    // Project management
+    createProject: (title: string) => void;
 
     // Graph edits
     addNode: (node: Node) => void;
@@ -97,6 +101,38 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 set({
                     activeGraphId: target.graphId,
                     navStack: newStack
+                });
+            },
+
+            createProject: (title) => {
+                const { projects, graphs } = get();
+                const projectId = uuidv4();
+                const rootGraphId = uuidv4();
+                const now = new Date().toISOString();
+
+                const newProject: Project = {
+                    id: projectId,
+                    title,
+                    rootGraphId,
+                    createdAt: now,
+                    updatedAt: now,
+                };
+
+                const rootGraph: Graph = {
+                    id: rootGraphId,
+                    projectId,
+                    title,
+                    nodes: [],
+                    edges: [],
+                };
+
+                set({
+                    projects: [...projects, newProject],
+                    graphs: { ...graphs, [rootGraphId]: rootGraph },
+                    activeProjectId: projectId,
+                    activeGraphId: rootGraphId,
+                    navStack: [{ graphId: rootGraphId, label: title }],
+                    executionMode: false,
                 });
             },
 
