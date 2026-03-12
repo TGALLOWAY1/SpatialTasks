@@ -24,6 +24,11 @@ interface WorkspaceState extends Workspace {
     // Graph edits
     addNode: (node: Node) => void;
     updateNode: (nodeId: string, data: Partial<Node>) => void;
+    removeNode: (nodeId: string) => void;
+    removeEdge: (edgeId: string) => void;
+    removeNodes: (nodeIds: string[]) => void;
+    cycleNodeStatus: (nodeId: string) => void;
+    batchUpdateNodes: (nodeIds: string[], data: Partial<Node>) => void;
     addGraph: (graph: Graph) => void;
     addEdge: (edge: Edge) => void;
     updateSettings: (settings: Partial<WorkspaceSettings>) => void;
@@ -155,6 +160,129 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 const graph = graphs[activeGraphId];
                 const updatedNodes = graph.nodes.map(n => n.id === nodeId ? { ...n, ...data } : n);
 
+                set({
+                    graphs: { ...graphs, [activeGraphId]: { ...graph, nodes: updatedNodes } }
+                });
+            },
+
+            removeNode: (nodeId) => {
+                const { activeGraphId, graphs } = get();
+                if (!activeGraphId) return;
+
+                const graph = graphs[activeGraphId];
+                const node = graph.nodes.find(n => n.id === nodeId);
+                if (!node) return;
+
+                // Collect descendant graph IDs for containers
+                const graphIdsToDelete: string[] = [];
+                const collectDescendantGraphIds = (graphId: string) => {
+                    const g = graphs[graphId];
+                    if (!g) return;
+                    graphIdsToDelete.push(graphId);
+                    g.nodes.forEach(n => {
+                        if (n.childGraphId) collectDescendantGraphIds(n.childGraphId);
+                    });
+                };
+                if (node.childGraphId) collectDescendantGraphIds(node.childGraphId);
+
+                // Remove node and its connected edges from the active graph
+                const updatedNodes = graph.nodes.filter(n => n.id !== nodeId);
+                const updatedEdges = graph.edges.filter(e => e.source !== nodeId && e.target !== nodeId);
+
+                const updatedGraphs = {
+                    ...graphs,
+                    [activeGraphId]: { ...graph, nodes: updatedNodes, edges: updatedEdges }
+                };
+
+                // Delete descendant graphs
+                graphIdsToDelete.forEach(id => delete updatedGraphs[id]);
+
+                set({ graphs: updatedGraphs });
+            },
+
+            removeEdge: (edgeId) => {
+                const { activeGraphId, graphs } = get();
+                if (!activeGraphId) return;
+
+                const graph = graphs[activeGraphId];
+                set({
+                    graphs: {
+                        ...graphs,
+                        [activeGraphId]: {
+                            ...graph,
+                            edges: graph.edges.filter(e => e.id !== edgeId)
+                        }
+                    }
+                });
+            },
+
+            removeNodes: (nodeIds) => {
+                const { activeGraphId, graphs } = get();
+                if (!activeGraphId) return;
+
+                const graph = graphs[activeGraphId];
+                const nodeIdSet = new Set(nodeIds);
+
+                // Collect all descendant graph IDs
+                const graphIdsToDelete: string[] = [];
+                const collectDescendantGraphIds = (graphId: string) => {
+                    const g = graphs[graphId];
+                    if (!g) return;
+                    graphIdsToDelete.push(graphId);
+                    g.nodes.forEach(n => {
+                        if (n.childGraphId) collectDescendantGraphIds(n.childGraphId);
+                    });
+                };
+                graph.nodes.forEach(n => {
+                    if (nodeIdSet.has(n.id) && n.childGraphId) {
+                        collectDescendantGraphIds(n.childGraphId);
+                    }
+                });
+
+                const updatedNodes = graph.nodes.filter(n => !nodeIdSet.has(n.id));
+                const updatedEdges = graph.edges.filter(e => !nodeIdSet.has(e.source) && !nodeIdSet.has(e.target));
+
+                const updatedGraphs = {
+                    ...graphs,
+                    [activeGraphId]: { ...graph, nodes: updatedNodes, edges: updatedEdges }
+                };
+                graphIdsToDelete.forEach(id => delete updatedGraphs[id]);
+
+                set({ graphs: updatedGraphs });
+            },
+
+            cycleNodeStatus: (nodeId) => {
+                const { activeGraphId, graphs } = get();
+                if (!activeGraphId) return;
+
+                const graph = graphs[activeGraphId];
+                const node = graph.nodes.find(n => n.id === nodeId);
+                if (!node || !node.status) return;
+
+                const cycle: Record<string, string> = {
+                    todo: 'in_progress',
+                    in_progress: 'done',
+                    done: 'todo'
+                };
+                const nextStatus = cycle[node.status] || 'todo';
+
+                const updatedNodes = graph.nodes.map(n =>
+                    n.id === nodeId ? { ...n, status: nextStatus as any } : n
+                );
+                set({
+                    graphs: { ...graphs, [activeGraphId]: { ...graph, nodes: updatedNodes } }
+                });
+            },
+
+            batchUpdateNodes: (nodeIds, data) => {
+                const { activeGraphId, graphs } = get();
+                if (!activeGraphId) return;
+
+                const graph = graphs[activeGraphId];
+                const nodeIdSet = new Set(nodeIds);
+                const updatedNodes = graph.nodes.map(n =>
+                    nodeIdSet.has(n.id) ? { ...n, ...data } : n
+                );
                 set({
                     graphs: { ...graphs, [activeGraphId]: { ...graph, nodes: updatedNodes } }
                 });
