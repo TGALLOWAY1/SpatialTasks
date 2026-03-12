@@ -44,6 +44,29 @@ html, body, #root {
   fill: #e5e7eb;
 }
 
+/* Touch device: enlarge ReactFlow handles for finger-friendly tapping */
+@media (hover: none) {
+  .react-flow__handle {
+    width: 20px;
+    height: 20px;
+    position: relative;
+  }
+  .react-flow__handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+  .react-flow__controls-button {
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+  }
+}
+
 @keyframes slide-in {
     from { transform: translateX(100%); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }

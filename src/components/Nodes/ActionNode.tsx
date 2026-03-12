@@ -71,7 +71,7 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                 <button
                     onClick={handleStatusClick}
                     className={clsx(
-                        "flex-shrink-0 hover:scale-125 transition-transform",
+                        "flex-shrink-0 hover:scale-125 transition-transform touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center",
                         !isBlocked && "cursor-pointer"
                     )}
                     title={isBlocked ? "Blocked" : "Click to cycle status"}

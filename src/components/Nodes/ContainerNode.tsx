@@ -221,7 +221,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                             <button
                                 onClick={handleMagicExpand}
                                 disabled={expanding}
-                                className="text-purple-300 hover:text-purple-100 hover:scale-110 transition-all flex items-center justify-center disabled:opacity-50"
+                                className="text-purple-300 hover:text-purple-100 hover:scale-110 transition-all flex items-center justify-center disabled:opacity-50 touch:min-h-[44px] touch:min-w-[44px]"
                                 title="Magic Expand — AI generates subtasks"
                             >
                                 {expanding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -230,7 +230,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
 
                         <button
                             onClick={handleEnter}
-                            className="opacity-100 text-indigo-200 hover:text-white hover:scale-110 transition-all flex items-center justify-center"
+                            className="opacity-100 text-indigo-200 hover:text-white hover:scale-110 transition-all flex items-center justify-center touch:min-h-[44px] touch:min-w-[44px]"
                             title="Enter Subgraph"
                         >
                             <ArrowRightCircle className="w-5 h-5" />

@@ -20,7 +20,7 @@ export const TopBar: React.FC = () => {
                         {index > 0 && <ChevronRight className="w-4 h-4 text-gray-600 mx-1" />}
                         <button
                             onClick={() => navigateToBreadcrumb(index)}
-                            className={`flex items-center hover:text-white transition-colors ${index === navStack.length - 1 ? 'text-white font-medium' : 'text-gray-400'
+                            className={`flex items-center hover:text-white transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:justify-center ${index === navStack.length - 1 ? 'text-white font-medium' : 'text-gray-400'
                                 }`}
                         >
                             {index === 0 && <Home className="w-4 h-4 mr-1" />}
@@ -34,7 +34,7 @@ export const TopBar: React.FC = () => {
                 <button
                     onClick={() => undo()}
                     disabled={pastStates.length === 0}
-                    className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1.5 touch:p-2.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
                     title="Undo (Ctrl+Z)"
                 >
                     <Undo2 className="w-4 h-4" />
@@ -42,7 +42,7 @@ export const TopBar: React.FC = () => {
                 <button
                     onClick={() => redo()}
                     disabled={futureStates.length === 0}
-                    className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1.5 touch:p-2.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
                     title="Redo (Ctrl+Shift+Z)"
                 >
                     <Redo2 className="w-4 h-4" />
