@@ -70,6 +70,22 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
         e.stopPropagation();
         if (data.childGraphId) {
             enterGraph(data.childGraphId, data.id, data.title);
+        } else {
+            // Create a child graph on-the-fly for new containers
+            const currentGraph = activeGraphId ? graphs[activeGraphId] : null;
+            const projectId = currentGraph?.projectId || '';
+            const childGraphId = uuidv4();
+            const childGraph: Graph = {
+                id: childGraphId,
+                projectId,
+                title: data.title,
+                nodes: [],
+                edges: [],
+                viewport: { x: 0, y: 0, zoom: 1 },
+            };
+            addGraph(childGraph);
+            updateNode(data.id, { childGraphId });
+            enterGraph(childGraphId, data.id, data.title);
         }
     };
 
