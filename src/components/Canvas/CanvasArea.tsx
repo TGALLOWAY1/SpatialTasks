@@ -14,6 +14,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { ContainerNode } from '../Nodes/ContainerNode';
 import { ActionNode } from '../Nodes/ActionNode';
+import { ContextMenu, MenuItem } from '../UI/ContextMenu';
+import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers } from 'lucide-react';
 
 const nodeTypes = {
     container: ContainerNode,
@@ -29,11 +31,19 @@ const CanvasInner: React.FC = () => {
     const removeNodes = useWorkspaceStore(state => state.removeNodes);
     const addEdge = useWorkspaceStore(state => state.addEdge);
     const addNode = useWorkspaceStore(state => state.addNode);
+    const batchUpdateNodes = useWorkspaceStore(state => state.batchUpdateNodes);
 
     const reactFlowInstance = useReactFlow();
 
     // Quick-add state for double-click on canvas
     const [quickAdd, setQuickAdd] = useState<{ x: number; y: number; screenX: number; screenY: number } | null>(null);
+
+    // Context menu state
+    const [contextMenu, setContextMenu] = useState<{
+        x: number; y: number;
+        nodeId?: string; edgeId?: string;
+        flowX?: number; flowY?: number;
+    } | null>(null);
 
     const graph = activeGraphId ? graphs[activeGraphId] : null;
 
@@ -134,6 +144,132 @@ const CanvasInner: React.FC = () => {
         });
     }, [reactFlowInstance]);
 
+    // Context menu handlers
+    const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: RFNode) => {
+        event.preventDefault();
+        setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
+    }, []);
+
+    const handleEdgeContextMenu = useCallback((event: React.MouseEvent, edge: RFEdge) => {
+        event.preventDefault();
+        setContextMenu({ x: event.clientX, y: event.clientY, edgeId: edge.id });
+    }, []);
+
+    const handlePaneContextMenu = useCallback((event: React.MouseEvent) => {
+        event.preventDefault();
+        const flowPosition = reactFlowInstance.screenToFlowPosition({
+            x: event.clientX, y: event.clientY,
+        });
+        setContextMenu({ x: event.clientX, y: event.clientY, flowX: flowPosition.x, flowY: flowPosition.y });
+    }, [reactFlowInstance]);
+
+    const buildContextMenuItems = useCallback((): MenuItem[] => {
+        if (!contextMenu || !activeGraphId) return [];
+
+        if (contextMenu.edgeId) {
+            return [{
+                label: 'Remove Dependency',
+                icon: <Trash2 className="w-4 h-4" />,
+                danger: true,
+                onClick: () => removeEdge(contextMenu.edgeId!),
+            }];
+        }
+
+        if (contextMenu.nodeId) {
+            const selectedNodes = reactFlowInstance.getNodes().filter(n => n.selected);
+            const isMulti = selectedNodes.length > 1 && selectedNodes.some(n => n.id === contextMenu.nodeId);
+            const node = graph?.nodes.find(n => n.id === contextMenu.nodeId);
+
+            if (isMulti) {
+                const nodeIds = selectedNodes.map(n => n.id);
+                return [
+                    {
+                        label: `Set Status (${selectedNodes.length} nodes)`,
+                        submenu: [
+                            { label: 'Todo', icon: <Circle className="w-4 h-4" />, onClick: () => batchUpdateNodes(nodeIds, { status: 'todo' }) },
+                            { label: 'In Progress', icon: <Clock className="w-4 h-4" />, onClick: () => batchUpdateNodes(nodeIds, { status: 'in_progress' }) },
+                            { label: 'Done', icon: <CheckCircle2 className="w-4 h-4" />, onClick: () => batchUpdateNodes(nodeIds, { status: 'done' }) },
+                        ],
+                        onClick: () => {},
+                    },
+                    {
+                        label: `Delete ${selectedNodes.length} nodes`,
+                        icon: <Trash2 className="w-4 h-4" />,
+                        danger: true,
+                        onClick: () => {
+                            if (window.confirm(`Delete ${selectedNodes.length} nodes?`)) {
+                                removeNodes(nodeIds);
+                            }
+                        },
+                    },
+                ];
+            }
+
+            const items: MenuItem[] = [];
+            if (node?.type === 'action') {
+                items.push({
+                    label: 'Set Status',
+                    submenu: [
+                        { label: 'Todo', icon: <Circle className="w-4 h-4" />, onClick: () => updateNode(contextMenu.nodeId!, { status: 'todo' }) },
+                        { label: 'In Progress', icon: <Clock className="w-4 h-4" />, onClick: () => updateNode(contextMenu.nodeId!, { status: 'in_progress' }) },
+                        { label: 'Done', icon: <CheckCircle2 className="w-4 h-4" />, onClick: () => updateNode(contextMenu.nodeId!, { status: 'done' }) },
+                    ],
+                    onClick: () => {},
+                });
+            }
+            items.push({
+                label: 'Delete',
+                icon: <Trash2 className="w-4 h-4" />,
+                danger: true,
+                shortcut: 'Del',
+                onClick: () => {
+                    if (node?.type === 'container') {
+                        if (!window.confirm('Delete this container and all its children?')) return;
+                    }
+                    removeNode(contextMenu.nodeId!);
+                },
+            });
+            return items;
+        }
+
+        // Pane context menu
+        return [
+            {
+                label: 'New Action Node',
+                icon: <Plus className="w-4 h-4" />,
+                onClick: () => {
+                    addNode({
+                        id: uuidv4(),
+                        graphId: activeGraphId,
+                        type: 'action',
+                        title: 'New Task',
+                        x: contextMenu.flowX ?? 0,
+                        y: contextMenu.flowY ?? 0,
+                        width: 200,
+                        height: 50,
+                        status: 'todo',
+                    });
+                },
+            },
+            {
+                label: 'New Container',
+                icon: <Layers className="w-4 h-4" />,
+                onClick: () => {
+                    addNode({
+                        id: uuidv4(),
+                        graphId: activeGraphId,
+                        type: 'container',
+                        title: 'New Group',
+                        x: contextMenu.flowX ?? 0,
+                        y: contextMenu.flowY ?? 0,
+                        width: 200,
+                        height: 80,
+                    });
+                },
+            },
+        ];
+    }, [contextMenu, activeGraphId, graph, reactFlowInstance, removeEdge, removeNode, removeNodes, updateNode, batchUpdateNodes, addNode]);
+
     if (!graph) return <div className="text-gray-500 flex items-center justify-center h-full">No graph selected</div>;
 
     return (
@@ -144,8 +280,11 @@ const CanvasInner: React.FC = () => {
                 nodeTypes={nodeTypes as any}
                 onNodesChange={onNodesChange}
                 onConnect={onConnect}
-                onPaneClick={() => setQuickAdd(null)}
+                onPaneClick={() => { setQuickAdd(null); setContextMenu(null); }}
                 onDoubleClick={handlePaneDoubleClick}
+                onNodeContextMenu={handleNodeContextMenu}
+                onEdgeContextMenu={handleEdgeContextMenu}
+                onPaneContextMenu={handlePaneContextMenu}
                 selectionOnDrag
                 multiSelectionKeyCode="Shift"
                 deleteKeyCode={null}
@@ -155,6 +294,16 @@ const CanvasInner: React.FC = () => {
                 <Background color="#374151" gap={20} />
                 <Controls className="bg-gray-800 border-gray-700 fill-gray-100" />
             </ReactFlow>
+
+            {/* Context menu */}
+            {contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    items={buildContextMenuItems()}
+                    onClose={() => setContextMenu(null)}
+                />
+            )}
 
             {/* Quick-add input on double-click */}
             {quickAdd && (
