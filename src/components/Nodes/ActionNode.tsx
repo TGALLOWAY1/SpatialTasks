@@ -65,7 +65,8 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
             isBlocked ? "bg-slate-900 border-slate-800 opacity-80" : "bg-slate-800",
             data.status === 'done' && "opacity-75",
             highlight && "ring-4 ring-amber-500/50 border-amber-500 shadow-amber-500/20 scale-105 z-10",
-            dim && "opacity-30 blur-[1px] grayscale"
+            dim && "opacity-30 blur-[1px] grayscale",
+            (data as any)._isConnectSource && "ring-4 ring-purple-500 animate-pulse"
         )}>
             <Handle type="target" position={Position.Left} className="w-3 h-3 bg-slate-400" />
 

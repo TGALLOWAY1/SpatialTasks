@@ -186,7 +186,8 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
             "px-4 py-3 rounded-lg shadow-xl border-2 w-[200px] bg-indigo-950 transition-[transform,opacity,border-color,box-shadow] duration-200 group relative",
             selected ? "border-indigo-400 shadow-indigo-500/30" : "border-indigo-800",
             highlight && "ring-4 ring-amber-500/50 border-amber-500 shadow-amber-500/20 scale-105 z-10",
-            dim && "opacity-30 blur-[1px] grayscale"
+            dim && "opacity-30 blur-[1px] grayscale",
+            (data as any)._isConnectSource && "ring-4 ring-purple-500 animate-pulse"
         )}>
             <Handle type="target" position={Position.Left} className="w-3 h-3 bg-indigo-400" />
 

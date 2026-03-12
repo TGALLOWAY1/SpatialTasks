@@ -12,11 +12,15 @@ interface WorkspaceState extends Workspace {
     _supabaseLoaded: boolean;
     selectMode: boolean;
     _hasSelection: boolean;
+    connectMode: { active: boolean; sourceNodeId?: string };
 
     // Actions
     resetWorkspace: (seed?: string) => void;
     toggleSelectMode: () => void;
     setHasSelection: (v: boolean) => void;
+    toggleConnectMode: () => void;
+    setConnectSource: (nodeId: string) => void;
+    clearConnectMode: () => void;
     loadProject: (projectId: string) => void;
     enterGraph: (graphId: string, nodeId: string, nodeLabel: string) => void;
     navigateBack: (steps?: number) => void;
@@ -58,6 +62,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             _supabaseLoaded: false,
             selectMode: false,
             _hasSelection: false,
+            connectMode: { active: false },
 
             toggleSelectMode: () => {
                 set(state => ({ selectMode: !state.selectMode }));
@@ -65,6 +70,22 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             setHasSelection: (v: boolean) => {
                 set({ _hasSelection: v });
+            },
+
+            toggleConnectMode: () => {
+                set(state => ({
+                    connectMode: state.connectMode.active
+                        ? { active: false }
+                        : { active: true },
+                }));
+            },
+
+            setConnectSource: (nodeId: string) => {
+                set({ connectMode: { active: true, sourceNodeId: nodeId } });
+            },
+
+            clearConnectMode: () => {
+                set({ connectMode: { active: false } });
             },
 
             resetWorkspace: (seed = '42') => {
@@ -400,7 +421,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             storage: createJSONStorage(() => localStorage),
             partialize: (state) => {
                 // Exclude transient flags and actions from localStorage
-                const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, ...rest } = state;
+                const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, connectMode, ...rest } = state;
                 return rest;
             },
             onRehydrateStorage: () => {

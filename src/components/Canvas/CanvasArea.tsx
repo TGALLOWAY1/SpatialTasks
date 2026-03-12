@@ -41,6 +41,9 @@ const CanvasInner: React.FC = () => {
     const batchUpdateNodes = useWorkspaceStore(state => state.batchUpdateNodes);
     const selectMode = useWorkspaceStore(state => state.selectMode);
     const setHasSelection = useWorkspaceStore(state => state.setHasSelection);
+    const connectMode = useWorkspaceStore(state => state.connectMode);
+    const setConnectSource = useWorkspaceStore(state => state.setConnectSource);
+    const clearConnectMode = useWorkspaceStore(state => state.clearConnectMode);
 
     const reactFlowInstance = useReactFlow();
 
@@ -80,10 +83,10 @@ const CanvasInner: React.FC = () => {
             id: n.id,
             type: n.type,
             position: { x: n.x, y: n.y },
-            data: { ...n },
-            draggable: true
+            data: { ...n, _isConnectSource: connectMode.sourceNodeId === n.id },
+            draggable: !connectMode.active,
         }));
-    }, [graph]);
+    }, [graph, connectMode]);
 
     const edges: RFEdge[] = useMemo(() => {
         if (!graph) return [];
@@ -210,6 +213,31 @@ const CanvasInner: React.FC = () => {
             screenY: event.clientY,
         });
     }, [reactFlowInstance]);
+
+    // Node click handler — handles connect mode tap-to-connect
+    const handleNodeClick = useCallback((_event: React.MouseEvent, node: RFNode) => {
+        if (!connectMode.active || !activeGraphId) return;
+
+        if (!connectMode.sourceNodeId) {
+            // First tap: set source
+            setConnectSource(node.id);
+        } else if (connectMode.sourceNodeId !== node.id) {
+            // Second tap: create edge
+            const g = graphs[activeGraphId];
+            const exists = g.edges.some(
+                e => e.source === connectMode.sourceNodeId && e.target === node.id
+            );
+            if (!exists) {
+                addEdge({
+                    id: uuidv4(),
+                    graphId: activeGraphId,
+                    source: connectMode.sourceNodeId,
+                    target: node.id,
+                });
+            }
+            clearConnectMode();
+        }
+    }, [connectMode, activeGraphId, graphs, addEdge, setConnectSource, clearConnectMode]);
 
     // Context menu handlers
     const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: RFNode) => {
@@ -536,7 +564,8 @@ const CanvasInner: React.FC = () => {
                 nodeTypes={nodeTypes as any}
                 onNodesChange={onNodesChange}
                 onConnect={onConnect}
-                onPaneClick={() => { setQuickAdd(null); setContextMenu(null); setActionSheet(null); }}
+                onNodeClick={handleNodeClick}
+                onPaneClick={() => { setQuickAdd(null); setContextMenu(null); setActionSheet(null); if (connectMode.active) clearConnectMode(); }}
                 onDoubleClick={isTouchDevice ? undefined : handlePaneDoubleClick}
                 onNodeContextMenu={handleNodeContextMenu}
                 onEdgeContextMenu={handleEdgeContextMenu}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { ChevronRight, Home, PlayCircle, StopCircle, Undo2, Redo2, Trash2, BoxSelect } from 'lucide-react';
+import { ChevronRight, Home, PlayCircle, StopCircle, Undo2, Redo2, Trash2, BoxSelect, Link } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useStore } from 'zustand';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
@@ -14,6 +14,8 @@ export const TopBar: React.FC = () => {
     const selectMode = useWorkspaceStore(state => state.selectMode);
     const toggleSelectMode = useWorkspaceStore(state => state.toggleSelectMode);
     const hasSelection = useWorkspaceStore(state => state._hasSelection);
+    const connectMode = useWorkspaceStore(state => state.connectMode);
+    const toggleConnectMode = useWorkspaceStore(state => state.toggleConnectMode);
 
     const { undo, redo, pastStates, futureStates } = useStore(useWorkspaceStore.temporal);
 
@@ -78,6 +80,22 @@ export const TopBar: React.FC = () => {
                         title={selectMode ? "Pan mode" : "Select mode"}
                     >
                         <BoxSelect className="w-4 h-4" />
+                    </button>
+                )}
+
+                {/* Mobile-only: Connect mode toggle */}
+                {isTouchDevice && (
+                    <button
+                        onClick={toggleConnectMode}
+                        className={clsx(
+                            "p-1.5 touch:p-2.5 rounded transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center",
+                            connectMode.active
+                                ? "text-purple-400 bg-purple-500/20"
+                                : "text-gray-400 hover:text-white hover:bg-gray-700"
+                        )}
+                        title={connectMode.active ? "Cancel connect" : "Connect nodes"}
+                    >
+                        <Link className="w-4 h-4" />
                     </button>
                 )}
 
