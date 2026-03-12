@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { temporal } from 'zundo';
 import { v4 as uuidv4 } from 'uuid';
 import { Workspace, Node, Graph, Edge, Project, WorkspaceSettings } from '../types';
 import { generateWorkspace } from '../utils/generator';
@@ -45,6 +46,7 @@ const STORAGE_KEY = 'spatialtasks-workspace';
 
 export const useWorkspaceStore = create<WorkspaceState>()(
     persist(
+        temporal(
         (set, get) => ({
             // Initial State (overridden by hydrate if exists, or generator)
             ...generateWorkspace('42'),
@@ -370,6 +372,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 set({ _supabaseLoaded: loaded });
             },
         }),
+        {
+            partialize: (state) => {
+                const { _hydrated, _supabaseLoaded, ...rest } = state;
+                // Only track data fields for undo/redo, not transient flags
+                return { graphs: rest.graphs, projects: rest.projects } as WorkspaceState;
+            },
+            limit: 50,
+        }
+        ),
         {
             name: STORAGE_KEY,
             storage: createJSONStorage(() => localStorage),

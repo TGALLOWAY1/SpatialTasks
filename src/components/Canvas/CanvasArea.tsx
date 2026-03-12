@@ -98,23 +98,37 @@ const CanvasInner: React.FC = () => {
         });
     }, [activeGraphId, graphs, addEdge]);
 
-    // Delete via keyboard
+    // Keyboard shortcuts: delete, undo, redo
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key !== 'Backspace' && e.key !== 'Delete') return;
-            // Don't delete when typing in an input
             const target = e.target as HTMLElement;
-            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+            const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+            // Undo: Ctrl/Cmd+Z
+            if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+                e.preventDefault();
+                useWorkspaceStore.temporal.getState().undo();
+                return;
+            }
+
+            // Redo: Ctrl/Cmd+Shift+Z
+            if (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+                e.preventDefault();
+                useWorkspaceStore.temporal.getState().redo();
+                return;
+            }
+
+            // Delete: Backspace or Delete
+            if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+            if (isTyping) return;
 
             const selectedNodes = reactFlowInstance.getNodes().filter(n => n.selected);
             const selectedEdges = reactFlowInstance.getEdges().filter(e => e.selected);
 
             if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
 
-            // Delete selected edges
             selectedEdges.forEach(edge => removeEdge(edge.id));
 
-            // Delete selected nodes
             if (selectedNodes.length > 0) {
                 const hasContainers = selectedNodes.some(n => n.type === 'container');
                 if (hasContainers) {
