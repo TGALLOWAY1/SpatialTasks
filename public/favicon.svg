@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <!-- Folder shape -->
+  <path d="M120 160 L120 380 Q120 400 140 400 L300 400 Q320 400 320 380 L320 200 Q320 180 300 180 L240 180 L220 155 Q215 148 205 148 L140 148 Q120 148 120 168 Z"
+        fill="none" stroke="#c084fc" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Node 1 (top) -->
+  <circle cx="290" cy="220" r="24" fill="#1e1b4b" stroke="#c084fc" stroke-width="22"/>
+  <!-- Connection line -->
+  <line x1="306" y1="238" x2="350" y2="300" stroke="#c084fc" stroke-width="18" stroke-linecap="round"/>
+  <!-- Node 2 (bottom-right) -->
+  <circle cx="365" cy="320" r="24" fill="#1e1b4b" stroke="#c084fc" stroke-width="22"/>
+</svg>

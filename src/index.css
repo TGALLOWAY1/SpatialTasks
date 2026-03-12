@@ -90,6 +90,12 @@ html, body, #root {
   }
 }
 
+/* Node resize control — hide default styling */
+.react-flow__resize-control {
+  background: transparent !important;
+  border: none !important;
+}
+
 /* Performance: GPU layer promotion for smooth mobile panning */
 .react-flow__nodes,
 .react-flow__edges {
