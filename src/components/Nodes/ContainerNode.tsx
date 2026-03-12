@@ -1,13 +1,15 @@
 import React, { memo, useMemo, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Node as SpatialNode, Graph, Edge } from '../../types';
-import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2 } from 'lucide-react';
+import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2, Pencil } from 'lucide-react';
 import { clsx } from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useToastStore } from '../UI/Toast';
 import { getContainerProgress, isNodeBlocked } from '../../utils/logic';
 import { magicExpand, GeminiError } from '../../services/gemini';
+import { ConfirmModal } from '../UI/ConfirmModal';
+import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
 const WIDTH = 200;
 const HEIGHT = 80;
@@ -24,6 +26,7 @@ const ProgressRing = ({ progress }: { progress: number }) => {
 };
 
 export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) => {
+    const { isTouchDevice } = useDeviceDetect();
     const enterGraph = useWorkspaceStore(state => state.enterGraph);
     const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
     const graphs = useWorkspaceStore(state => state.graphs);
@@ -37,6 +40,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
     const [expanding, setExpanding] = useState(false);
     const [editing, setEditing] = useState(false);
     const [editValue, setEditValue] = useState(data.title);
+    const [showExpandConfirm, setShowExpandConfirm] = useState(false);
 
     const progress = useMemo(() => {
         return getContainerProgress(data, { graphs } as any);
@@ -89,21 +93,12 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
         }
     };
 
-    const handleMagicExpand = async (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (!settings.geminiApiKey) return;
-
-        if (hasExistingChildren) {
-            if (!window.confirm('This container already has subtasks. Replace them with AI-generated ones?')) {
-                return;
-            }
-        }
-
+    const doMagicExpand = async () => {
         setExpanding(true);
 
         try {
             const result = await magicExpand(
-                settings.geminiApiKey,
+                settings.geminiApiKey!,
                 data.title,
                 data.meta?.notes
             );
@@ -174,12 +169,25 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
         }
     };
 
+    const handleMagicExpand = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!settings.geminiApiKey) return;
+
+        if (hasExistingChildren) {
+            setShowExpandConfirm(true);
+            return;
+        }
+
+        doMagicExpand();
+    };
+
     return (
         <div className={clsx(
-            "px-4 py-3 rounded-lg shadow-xl border-2 w-[200px] bg-indigo-950 transition-all group relative",
+            "px-4 py-3 rounded-lg shadow-xl border-2 w-[200px] bg-indigo-950 transition-[transform,opacity,border-color,box-shadow] duration-200 group relative",
             selected ? "border-indigo-400 shadow-indigo-500/30" : "border-indigo-800",
             highlight && "ring-4 ring-amber-500/50 border-amber-500 shadow-amber-500/20 scale-105 z-10",
-            dim && "opacity-30 blur-[1px] grayscale"
+            dim && "opacity-30 blur-[1px] grayscale",
+            (data as any)._isConnectSource && "ring-4 ring-purple-500 animate-pulse"
         )}>
             <Handle type="target" position={Position.Left} className="w-3 h-3 bg-indigo-400" />
 
@@ -221,7 +229,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                             <button
                                 onClick={handleMagicExpand}
                                 disabled={expanding}
-                                className="text-purple-300 hover:text-purple-100 hover:scale-110 transition-all flex items-center justify-center disabled:opacity-50"
+                                className="text-purple-300 hover:text-purple-100 hover:scale-110 transition-all flex items-center justify-center disabled:opacity-50 touch:min-h-[44px] touch:min-w-[44px]"
                                 title="Magic Expand — AI generates subtasks"
                             >
                                 {expanding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -230,7 +238,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
 
                         <button
                             onClick={handleEnter}
-                            className="opacity-100 text-indigo-200 hover:text-white hover:scale-110 transition-all flex items-center justify-center"
+                            className="opacity-100 text-indigo-200 hover:text-white hover:scale-110 transition-all flex items-center justify-center touch:min-h-[44px] touch:min-w-[44px]"
                             title="Enter Subgraph"
                         >
                             <ArrowRightCircle className="w-5 h-5" />
@@ -245,6 +253,21 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                 </div>
             )}
 
+            {/* Touch: floating Edit Title button when selected */}
+            {selected && isTouchDevice && !editing && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setEditing(true);
+                        setEditValue(data.title);
+                    }}
+                    className="absolute -top-10 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 min-h-[32px] active:bg-indigo-500 z-20"
+                >
+                    <Pencil className="w-3 h-3" />
+                    Edit Title
+                </button>
+            )}
+
             {/* Progress bar visual at bottom */}
             <div className="absolute bottom-0 left-0 h-1 bg-indigo-900 w-full rounded-b-lg overflow-hidden">
                 <div
@@ -254,6 +277,20 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
             </div>
 
             <Handle type="source" position={Position.Right} className="w-3 h-3 bg-indigo-400" />
+
+            {showExpandConfirm && (
+                <ConfirmModal
+                    title="Replace Subtasks"
+                    message="This container already has subtasks. Replace them with AI-generated ones?"
+                    confirmLabel="Replace"
+                    danger
+                    onConfirm={() => {
+                        setShowExpandConfirm(false);
+                        doMagicExpand();
+                    }}
+                    onCancel={() => setShowExpandConfirm(false)}
+                />
+            )}
         </div>
     );
 });

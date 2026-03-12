@@ -33,7 +33,7 @@ const SubMenu: React.FC<{ items: MenuItem[]; parentRight: number; parentTop: num
                     }}
                     disabled={item.disabled}
                     className={clsx(
-                        "w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors",
+                        "w-full text-left px-3 py-1.5 touch:py-3 touch:px-4 text-sm flex items-center gap-2 transition-colors touch:min-h-[48px]",
                         item.disabled && "opacity-40 cursor-not-allowed",
                         item.danger
                             ? "text-red-400 hover:bg-red-500/20"
@@ -91,14 +91,17 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
-                            if (!item.disabled && !item.submenu) {
+                            if (!item.disabled && item.submenu) {
+                                // Toggle submenu on click (needed for touch devices)
+                                setActiveSubmenu(activeSubmenu === i ? null : i);
+                            } else if (!item.disabled) {
                                 item.onClick();
                                 onClose();
                             }
                         }}
                         disabled={item.disabled}
                         className={clsx(
-                            "w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors",
+                            "w-full text-left px-3 py-1.5 touch:py-3 touch:px-4 text-sm flex items-center gap-2 transition-colors touch:min-h-[48px]",
                             item.disabled && "opacity-40 cursor-not-allowed",
                             item.danger
                                 ? "text-red-400 hover:bg-red-500/20"

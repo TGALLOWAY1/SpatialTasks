@@ -1,10 +1,11 @@
 import { memo, useMemo, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Node } from '../../types';
-import { CheckCircle2, Circle, Clock, Lock, ArrowBigRightDash } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Lock, ArrowBigRightDash, Pencil } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { isNodeBlocked, isNodeActionable } from '../../utils/logic';
+import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
 const StatusIcon = ({ status, blocked }: { status?: string, blocked?: boolean }) => {
     if (blocked) return <Lock className="w-4 h-4 text-gray-500" />;
@@ -16,6 +17,7 @@ const StatusIcon = ({ status, blocked }: { status?: string, blocked?: boolean })
 };
 
 export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
+    const { isTouchDevice } = useDeviceDetect();
     const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
     const graphs = useWorkspaceStore(state => state.graphs);
     const executionMode = useWorkspaceStore(state => state.executionMode);
@@ -58,12 +60,13 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
 
     return (
         <div className={clsx(
-            "px-4 py-2 rounded-lg shadow-lg border-2 w-[200px] transition-all relative",
+            "px-4 py-2 rounded-lg shadow-lg border-2 w-[200px] transition-[transform,opacity,border-color,box-shadow] duration-200 relative",
             selected ? "border-purple-500 shadow-purple-500/20" : "border-slate-700",
             isBlocked ? "bg-slate-900 border-slate-800 opacity-80" : "bg-slate-800",
             data.status === 'done' && "opacity-75",
             highlight && "ring-4 ring-amber-500/50 border-amber-500 shadow-amber-500/20 scale-105 z-10",
-            dim && "opacity-30 blur-[1px] grayscale"
+            dim && "opacity-30 blur-[1px] grayscale",
+            (data as any)._isConnectSource && "ring-4 ring-purple-500 animate-pulse"
         )}>
             <Handle type="target" position={Position.Left} className="w-3 h-3 bg-slate-400" />
 
@@ -71,7 +74,7 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                 <button
                     onClick={handleStatusClick}
                     className={clsx(
-                        "flex-shrink-0 hover:scale-125 transition-transform",
+                        "flex-shrink-0 hover:scale-125 transition-transform touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center",
                         !isBlocked && "cursor-pointer"
                     )}
                     title={isBlocked ? "Blocked" : "Click to cycle status"}
@@ -106,6 +109,21 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                     </span>
                 )}
             </div>
+
+            {/* Touch: floating Edit button when selected */}
+            {selected && isTouchDevice && !editing && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setEditing(true);
+                        setEditValue(data.title);
+                    }}
+                    className="absolute -top-10 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 min-h-[32px] active:bg-purple-500 z-20"
+                >
+                    <Pencil className="w-3 h-3" />
+                    Edit
+                </button>
+            )}
 
             {isBlocked && (
                 <div className="absolute -top-2 -right-2 bg-red-900/80 text-red-200 text-[10px] px-1.5 py-0.5 rounded-full border border-red-800">

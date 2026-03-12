@@ -2,11 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --sat: env(safe-area-inset-top);
+  --sar: env(safe-area-inset-right);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+}
+
 html, body, #root {
   height: 100%;
   width: 100%;
   margin: 0;
   overflow: hidden;
+  /* Prevent iOS Safari bounce scroll when modals/sheets are open */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ReactFlow controls — dark theme override */
@@ -25,16 +35,60 @@ html, body, #root {
   padding: 6px;
 }
 
-.react-flow__controls-button:hover {
-  background: #374151;
+@media (hover: hover) {
+  .react-flow__controls-button:hover {
+    background: #374151;
+  }
+  .react-flow__controls-button:hover svg {
+    fill: #e5e7eb;
+  }
 }
 
 .react-flow__controls-button svg {
   fill: #9ca3af;
 }
 
-.react-flow__controls-button:hover svg {
-  fill: #e5e7eb;
+/* Touch: active states for visual feedback instead of hover */
+@media (hover: none) {
+  button:active {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
+  .react-flow__controls-button:active {
+    background: #374151;
+  }
+  .react-flow__controls-button:active svg {
+    fill: #e5e7eb;
+  }
+}
+
+/* Touch device: enlarge ReactFlow handles for finger-friendly tapping */
+@media (hover: none) {
+  .react-flow__handle {
+    width: 20px;
+    height: 20px;
+    position: relative;
+  }
+  .react-flow__handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+  .react-flow__controls-button {
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+  }
+}
+
+/* Performance: GPU layer promotion for smooth mobile panning */
+.react-flow__nodes,
+.react-flow__edges {
+  will-change: transform;
 }
 
 @keyframes slide-in {
@@ -43,4 +97,12 @@ html, body, #root {
 }
 .animate-slide-in {
     animation: slide-in 0.2s ease-out;
+}
+
+@keyframes slide-in-left {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+}
+.animate-slide-in-left {
+    animation: slide-in-left 0.2s ease-out;
 }
