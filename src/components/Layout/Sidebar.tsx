@@ -4,12 +4,13 @@ import { useAuthStore } from '../../store/authStore';
 import { useToastStore } from '../UI/Toast';
 import { supabase } from '../../lib/supabase';
 import { clsx } from 'clsx';
-import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock } from 'lucide-react';
+import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
     const projects = useWorkspaceStore(state => state.projects);
     const activeProjectId = useWorkspaceStore(state => state.activeProjectId);
     const loadProject = useWorkspaceStore(state => state.loadProject);
+    const createProject = useWorkspaceStore(state => state.createProject);
     const resetWorkspace = useWorkspaceStore(state => state.resetWorkspace);
     const settings = useWorkspaceStore(state => state.settings);
     const updateSettings = useWorkspaceStore(state => state.updateSettings);
@@ -21,6 +22,8 @@ export const Sidebar: React.FC = () => {
     const [keyInput, setKeyInput] = useState(settings.geminiApiKey || '');
     const [newPassword, setNewPassword] = useState('');
     const [changingPassword, setChangingPassword] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
+    const [newProjectTitle, setNewProjectTitle] = useState('');
 
     const geminiStatus = settings.geminiStatus || (settings.geminiApiKey ? 'configured' : 'no_key');
 
@@ -213,8 +216,48 @@ export const Sidebar: React.FC = () => {
             ) : (
                 <>
                     <div className="flex-1 overflow-y-auto p-2">
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">Projects</h3>
+                        <div className="flex items-center justify-between mb-2 px-2">
+                            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Projects</h3>
+                            <button
+                                onClick={() => setIsCreating(true)}
+                                className="p-0.5 rounded text-gray-500 hover:text-purple-400 hover:bg-gray-800 transition-colors"
+                                title="New project"
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                        </div>
                         <div className="space-y-1">
+                            {isCreating && (
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const title = newProjectTitle.trim() || 'Untitled Project';
+                                        createProject(title);
+                                        setNewProjectTitle('');
+                                        setIsCreating(false);
+                                        addToast(`Created "${title}"`, 'success');
+                                    }}
+                                >
+                                    <input
+                                        autoFocus
+                                        value={newProjectTitle}
+                                        onChange={(e) => setNewProjectTitle(e.target.value)}
+                                        onBlur={() => {
+                                            if (!newProjectTitle.trim()) {
+                                                setIsCreating(false);
+                                            }
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Escape') {
+                                                setNewProjectTitle('');
+                                                setIsCreating(false);
+                                            }
+                                        }}
+                                        placeholder="Project name..."
+                                        className="w-full px-3 py-2 rounded-md text-sm bg-gray-800 border border-purple-600 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400"
+                                    />
+                                </form>
+                            )}
                             {projects.map(project => (
                                 <button
                                     key={project.id}
