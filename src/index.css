@@ -82,6 +82,12 @@ html, body, #root {
   }
 }
 
+/* Performance: GPU layer promotion for smooth mobile panning */
+.react-flow__nodes,
+.react-flow__edges {
+  will-change: transform;
+}
+
 @keyframes slide-in {
     from { transform: translateX(100%); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }

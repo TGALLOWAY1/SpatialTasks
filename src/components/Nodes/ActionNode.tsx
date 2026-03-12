@@ -58,7 +58,7 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
 
     return (
         <div className={clsx(
-            "px-4 py-2 rounded-lg shadow-lg border-2 w-[200px] transition-all relative",
+            "px-4 py-2 rounded-lg shadow-lg border-2 w-[200px] transition-[transform,opacity,border-color,box-shadow] duration-200 relative",
             selected ? "border-purple-500 shadow-purple-500/20" : "border-slate-700",
             isBlocked ? "bg-slate-900 border-slate-800 opacity-80" : "bg-slate-800",
             data.status === 'done' && "opacity-75",

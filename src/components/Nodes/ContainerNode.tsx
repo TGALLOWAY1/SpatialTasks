@@ -176,7 +176,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
 
     return (
         <div className={clsx(
-            "px-4 py-3 rounded-lg shadow-xl border-2 w-[200px] bg-indigo-950 transition-all group relative",
+            "px-4 py-3 rounded-lg shadow-xl border-2 w-[200px] bg-indigo-950 transition-[transform,opacity,border-color,box-shadow] duration-200 group relative",
             selected ? "border-indigo-400 shadow-indigo-500/30" : "border-indigo-800",
             highlight && "ring-4 ring-amber-500/50 border-amber-500 shadow-amber-500/20 scale-105 z-10",
             dim && "opacity-30 blur-[1px] grayscale"

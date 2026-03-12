@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useEffect, useState } from 'react';
+import React, { useMemo, useCallback, useEffect, useState, useRef } from 'react';
 import ReactFlow, {
     Background,
     Controls,
@@ -16,6 +16,7 @@ import { ContainerNode } from '../Nodes/ContainerNode';
 import { ActionNode } from '../Nodes/ActionNode';
 import { ContextMenu, MenuItem } from '../UI/ContextMenu';
 import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers } from 'lucide-react';
+import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
 const nodeTypes = {
     container: ContainerNode,
@@ -23,6 +24,9 @@ const nodeTypes = {
 };
 
 const CanvasInner: React.FC = () => {
+    const { isTouchDevice } = useDeviceDetect();
+    const rafRef = useRef<number>(0);
+
     const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
     const graphs = useWorkspaceStore(state => state.graphs);
     const updateNode = useWorkspaceStore(state => state.updateNode);
@@ -66,18 +70,27 @@ const CanvasInner: React.FC = () => {
             source: e.source,
             target: e.target,
             type: 'default',
-            animated: true,
+            animated: !isTouchDevice,
             style: { stroke: '#4b5563' }
         }));
-    }, [graph]);
+    }, [graph, isTouchDevice]);
 
     const onNodesChange = useCallback((changes: NodeChange[]) => {
-        changes.forEach(change => {
-            if (change.type === 'position' && change.position) {
-                updateNode(change.id, { x: change.position.x, y: change.position.y });
-            }
-        });
-    }, [updateNode]);
+        const applyChanges = () => {
+            changes.forEach(change => {
+                if (change.type === 'position' && change.position) {
+                    updateNode(change.id, { x: change.position.x, y: change.position.y });
+                }
+            });
+        };
+
+        if (isTouchDevice) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = requestAnimationFrame(applyChanges);
+        } else {
+            applyChanges();
+        }
+    }, [updateNode, isTouchDevice]);
 
     // Drag-to-connect edges
     const onConnect = useCallback((connection: Connection) => {
