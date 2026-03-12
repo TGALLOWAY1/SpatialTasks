@@ -1,6 +1,6 @@
 import React from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { ChevronRight, Home, PlayCircle, StopCircle, Undo2, Redo2, Trash2, BoxSelect, Link, Menu } from 'lucide-react';
+import { ChevronRight, Home, PlayCircle, StopCircle, Undo2, Redo2, Trash2, BoxSelect, Link, Menu, LayoutGrid, List } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useStore } from 'zustand';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
@@ -17,6 +17,8 @@ export const TopBar: React.FC = () => {
     const connectMode = useWorkspaceStore(state => state.connectMode);
     const toggleConnectMode = useWorkspaceStore(state => state.toggleConnectMode);
     const toggleSidebar = useWorkspaceStore(state => state.toggleSidebar);
+    const viewMode = useWorkspaceStore(state => state.viewMode);
+    const setViewMode = useWorkspaceStore(state => state.setViewMode);
 
     const { undo, redo, pastStates, futureStates } = useStore(useWorkspaceStore.temporal);
 
@@ -49,6 +51,34 @@ export const TopBar: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1 touch:gap-0">
+                {/* View mode toggle: Graph / List */}
+                <div className="flex items-center bg-gray-800 rounded-lg p-0.5 mr-1">
+                    <button
+                        onClick={() => setViewMode('graph')}
+                        className={clsx(
+                            "p-1.5 rounded transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:flex-col touch:items-center touch:justify-center",
+                            viewMode === 'graph'
+                                ? "bg-gray-700 text-white"
+                                : "text-gray-400 hover:text-white"
+                        )}
+                        title="Node view"
+                    >
+                        <LayoutGrid className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => setViewMode('list')}
+                        className={clsx(
+                            "p-1.5 rounded transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:flex-col touch:items-center touch:justify-center",
+                            viewMode === 'list'
+                                ? "bg-gray-700 text-white"
+                                : "text-gray-400 hover:text-white"
+                        )}
+                        title="List view"
+                    >
+                        <List className="w-4 h-4" />
+                    </button>
+                </div>
+
                 <button
                     onClick={() => undo()}
                     disabled={pastStates.length === 0}

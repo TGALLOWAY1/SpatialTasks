@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Sidebar } from './components/Layout/Sidebar';
 import { TopBar } from './components/Layout/TopBar';
 import { CanvasArea } from './components/Canvas/CanvasArea';
+import { ListView } from './components/ListView/ListView';
 import { ToastContainer } from './components/UI/Toast';
 import { LoadingScreen } from './components/UI/LoadingScreen';
 import { useWorkspaceStore } from './store/workspaceStore';
@@ -14,6 +15,7 @@ function App() {
     const activeProjectId = useWorkspaceStore(state => state.activeProjectId);
     const projects = useWorkspaceStore(state => state.projects);
     const loadProject = useWorkspaceStore(state => state.loadProject);
+    const viewMode = useWorkspaceStore(state => state.viewMode);
 
     useEffect(() => {
         if (!activeProjectId && projects.length > 0) {
@@ -30,7 +32,7 @@ function App() {
             <Sidebar />
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
                 <TopBar />
-                <CanvasArea />
+                {viewMode === 'list' ? <ListView /> : <CanvasArea />}
             </div>
             <ToastContainer />
         </div>

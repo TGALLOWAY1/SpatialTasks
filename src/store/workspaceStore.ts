@@ -14,6 +14,7 @@ interface WorkspaceState extends Workspace {
     _hasSelection: boolean;
     connectMode: { active: boolean; sourceNodeId?: string };
     sidebarOpen: boolean;
+    viewMode: 'graph' | 'list';
 
     // Actions
     resetWorkspace: (seed?: string) => void;
@@ -24,6 +25,7 @@ interface WorkspaceState extends Workspace {
     clearConnectMode: () => void;
     toggleSidebar: () => void;
     closeSidebar: () => void;
+    setViewMode: (mode: 'graph' | 'list') => void;
     loadProject: (projectId: string) => void;
     enterGraph: (graphId: string, nodeId: string, nodeLabel: string) => void;
     navigateBack: (steps?: number) => void;
@@ -67,6 +69,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             _hasSelection: false,
             connectMode: { active: false },
             sidebarOpen: false,
+            viewMode: 'graph' as const,
 
             toggleSelectMode: () => {
                 set(state => ({ selectMode: !state.selectMode }));
@@ -98,6 +101,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             closeSidebar: () => {
                 set({ sidebarOpen: false });
+            },
+
+            setViewMode: (mode) => {
+                set({ viewMode: mode });
             },
 
             resetWorkspace: (seed = '42') => {
@@ -433,7 +440,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             storage: createJSONStorage(() => localStorage),
             partialize: (state) => {
                 // Exclude transient flags and actions from localStorage
-                const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, connectMode, sidebarOpen, ...rest } = state;
+                const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, connectMode, sidebarOpen, viewMode, ...rest } = state;
                 return rest;
             },
             onRehydrateStorage: () => {
