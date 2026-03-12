@@ -10,9 +10,13 @@ interface WorkspaceState extends Workspace {
     // Transient flags (not persisted)
     _hydrated: boolean;
     _supabaseLoaded: boolean;
+    selectMode: boolean;
+    _hasSelection: boolean;
 
     // Actions
     resetWorkspace: (seed?: string) => void;
+    toggleSelectMode: () => void;
+    setHasSelection: (v: boolean) => void;
     loadProject: (projectId: string) => void;
     enterGraph: (graphId: string, nodeId: string, nodeLabel: string) => void;
     navigateBack: (steps?: number) => void;
@@ -52,6 +56,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             ...generateWorkspace('42'),
             _hydrated: false,
             _supabaseLoaded: false,
+            selectMode: false,
+            _hasSelection: false,
+
+            toggleSelectMode: () => {
+                set(state => ({ selectMode: !state.selectMode }));
+            },
+
+            setHasSelection: (v: boolean) => {
+                set({ _hasSelection: v });
+            },
 
             resetWorkspace: (seed = '42') => {
                 set(generateWorkspace(seed));
@@ -386,7 +400,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             storage: createJSONStorage(() => localStorage),
             partialize: (state) => {
                 // Exclude transient flags and actions from localStorage
-                const { _hydrated, _supabaseLoaded, ...rest } = state;
+                const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, ...rest } = state;
                 return rest;
             },
             onRehydrateStorage: () => {

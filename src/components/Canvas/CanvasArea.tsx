@@ -39,6 +39,8 @@ const CanvasInner: React.FC = () => {
     const addEdge = useWorkspaceStore(state => state.addEdge);
     const addNode = useWorkspaceStore(state => state.addNode);
     const batchUpdateNodes = useWorkspaceStore(state => state.batchUpdateNodes);
+    const selectMode = useWorkspaceStore(state => state.selectMode);
+    const setHasSelection = useWorkspaceStore(state => state.setHasSelection);
 
     const reactFlowInstance = useReactFlow();
 
@@ -131,6 +133,30 @@ const CanvasInner: React.FC = () => {
         });
     }, [activeGraphId, graphs, addEdge]);
 
+    // Shared delete-selected logic (used by keyboard handler and toolbar button)
+    const deleteSelected = useCallback(() => {
+        const selectedNodes = reactFlowInstance.getNodes().filter(n => n.selected);
+        const selectedEdges = reactFlowInstance.getEdges().filter(e => e.selected);
+
+        if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
+
+        selectedEdges.forEach(edge => removeEdge(edge.id));
+
+        if (selectedNodes.length > 0) {
+            const nodeIds = selectedNodes.map(n => n.id);
+            const hasContainers = selectedNodes.some(n => n.type === 'container');
+            if (hasContainers) {
+                setConfirmAction({
+                    title: 'Delete Nodes',
+                    message: `Delete ${selectedNodes.length} node(s)? Container nodes and their children will be removed.`,
+                    onConfirm: () => removeNodes(nodeIds),
+                });
+                return;
+            }
+            removeNodes(nodeIds);
+        }
+    }, [reactFlowInstance, removeEdge, removeNodes]);
+
     // Keyboard shortcuts: delete, undo, redo
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -155,31 +181,21 @@ const CanvasInner: React.FC = () => {
             if (e.key !== 'Backspace' && e.key !== 'Delete') return;
             if (isTyping) return;
 
-            const selectedNodes = reactFlowInstance.getNodes().filter(n => n.selected);
-            const selectedEdges = reactFlowInstance.getEdges().filter(e => e.selected);
-
-            if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
-
-            selectedEdges.forEach(edge => removeEdge(edge.id));
-
-            if (selectedNodes.length > 0) {
-                const nodeIds = selectedNodes.map(n => n.id);
-                const hasContainers = selectedNodes.some(n => n.type === 'container');
-                if (hasContainers) {
-                    setConfirmAction({
-                        title: 'Delete Nodes',
-                        message: `Delete ${selectedNodes.length} node(s)? Container nodes and their children will be removed.`,
-                        onConfirm: () => removeNodes(nodeIds),
-                    });
-                    return;
-                }
-                removeNodes(nodeIds);
-            }
+            deleteSelected();
         };
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [reactFlowInstance, removeEdge, removeNode, removeNodes]);
+    }, [deleteSelected]);
+
+    // Listen for toolbar delete event (from TopBar delete button)
+    useEffect(() => {
+        const handler = () => deleteSelected();
+        document.addEventListener('canvas:delete-selected', handler);
+        return () => document.removeEventListener('canvas:delete-selected', handler);
+    }, [deleteSelected]);
+
+    // (hasSelection tracked via store's setHasSelection)
 
     // Double-click canvas to add node
     const handlePaneDoubleClick = useCallback((event: React.MouseEvent) => {
@@ -525,7 +541,11 @@ const CanvasInner: React.FC = () => {
                 onNodeContextMenu={handleNodeContextMenu}
                 onEdgeContextMenu={handleEdgeContextMenu}
                 onPaneContextMenu={handlePaneContextMenu}
-                selectionOnDrag
+                onSelectionChange={({ nodes: selNodes, edges: selEdges }) => {
+                    setHasSelection((selNodes?.length ?? 0) > 0 || (selEdges?.length ?? 0) > 0);
+                }}
+                panOnDrag={isTouchDevice ? !selectMode : true}
+                selectionOnDrag={isTouchDevice ? selectMode : true}
                 multiSelectionKeyCode="Shift"
                 deleteKeyCode={null}
                 fitView
