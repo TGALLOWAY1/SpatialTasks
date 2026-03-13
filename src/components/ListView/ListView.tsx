@@ -291,21 +291,35 @@ export const ListView: React.FC = () => {
         return [...containers, ...actions];
     }, [graph]);
 
+    const getNextNodePosition = useCallback(() => {
+        if (!graph || graph.nodes.length === 0) {
+            return { x: 0, y: 0 };
+        }
+        // Place below the last node in a vertical list layout
+        const sortedByY = [...graph.nodes].sort((a, b) => (a.y + (a.height ?? 50)) - (b.y + (b.height ?? 50)));
+        const lastNode = sortedByY[sortedByY.length - 1];
+        return {
+            x: lastNode.x,
+            y: lastNode.y + (lastNode.height ?? 50) + 30,
+        };
+    }, [graph]);
+
     const handleAddTask = useCallback(() => {
         if (!newTaskTitle.trim() || !activeGraphId) return;
+        const pos = getNextNodePosition();
         addNode({
             id: uuidv4(),
             graphId: activeGraphId,
             type: 'action',
             title: newTaskTitle.trim(),
-            x: Math.random() * 400,
-            y: Math.random() * 300,
+            x: pos.x,
+            y: pos.y,
             width: 200,
             height: 50,
             status: 'todo',
         });
         setNewTaskTitle('');
-    }, [newTaskTitle, activeGraphId, addNode]);
+    }, [newTaskTitle, activeGraphId, addNode, getNextNodePosition]);
 
     if (!graph) {
         return <div className="text-gray-500 flex items-center justify-center h-full">No graph selected</div>;
