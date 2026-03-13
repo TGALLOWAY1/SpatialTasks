@@ -2,6 +2,7 @@ import React, { useMemo, useCallback, useEffect, useState, useRef } from 'react'
 import ReactFlow, {
     Background,
     Controls,
+    MiniMap,
     Node as RFNode,
     Edge as RFEdge,
     NodeChange,
@@ -583,6 +584,19 @@ const CanvasInner: React.FC = () => {
             >
                 <Background color="#374151" gap={20} />
                 <Controls className="bg-gray-800 border-gray-700 fill-gray-100" />
+                {!isTouchDevice && (
+                    <MiniMap
+                        nodeColor={(node) => node.type === 'container' ? '#4338ca' : '#334155'}
+                        maskColor="rgba(0, 0, 0, 0.7)"
+                        style={{
+                            backgroundColor: '#111827',
+                            border: '1px solid #374151',
+                            borderRadius: 8,
+                        }}
+                        pannable
+                        zoomable
+                    />
+                )}
             </ReactFlow>
 
             {/* Context menu */}
