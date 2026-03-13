@@ -29,7 +29,7 @@ export const TopBar: React.FC = () => {
     // Close overflow menu when clicking outside
     useEffect(() => {
         if (!overflowOpen) return;
-        const handleClick = (e: MouseEvent) => {
+        const handleClick = (e: Event) => {
             if (overflowRef.current && !overflowRef.current.contains(e.target as HTMLElement)) {
                 setOverflowOpen(false);
             }
