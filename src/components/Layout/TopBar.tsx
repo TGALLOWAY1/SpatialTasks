@@ -4,6 +4,7 @@ import { ChevronRight, Home, Undo2, Redo2, Trash2, BoxSelect, Link, Menu, Layout
 import { clsx } from 'clsx';
 import { useStore } from 'zustand';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
+import { SaveIndicator } from '../UI/SaveIndicator';
 
 export const TopBar: React.FC = () => {
     const { isTouchDevice } = useDeviceDetect();
@@ -76,6 +77,7 @@ export const TopBar: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1 touch:gap-0">
+                <SaveIndicator />
                 {/* View mode toggle: Graph / List */}
                 <div className="flex items-center bg-gray-800 rounded-lg p-0.5 mr-1">
                     <button
