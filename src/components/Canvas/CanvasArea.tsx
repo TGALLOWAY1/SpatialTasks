@@ -19,7 +19,7 @@ import { ContextMenu, MenuItem } from '../UI/ContextMenu';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { ActionSheet } from '../UI/ActionSheet';
 import { FloatingActionButton } from '../UI/FloatingActionButton';
-import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers } from 'lucide-react';
+import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick } from 'lucide-react';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
 const nodeTypes = {
@@ -598,6 +598,23 @@ const CanvasInner: React.FC = () => {
                     />
                 )}
             </ReactFlow>
+
+            {/* Empty state guidance */}
+            {graph.nodes.length === 0 && !quickAdd && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                    <div className="text-center space-y-3 max-w-xs">
+                        <MousePointerClick className="w-10 h-10 text-gray-600 mx-auto" />
+                        <p className="text-gray-400 text-sm font-medium">
+                            {isTouchDevice ? 'Tap the + button to add a task' : 'Double-click to add a task'}
+                        </p>
+                        <p className="text-gray-600 text-xs">
+                            {isTouchDevice
+                                ? 'Or long-press the canvas for more options'
+                                : 'Or right-click for more options like creating containers'}
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Context menu */}
             {contextMenu && (
