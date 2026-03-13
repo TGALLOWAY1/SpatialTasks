@@ -43,6 +43,7 @@ export const TopBar: React.FC = () => {
     }, [overflowOpen]);
 
     return (
+        <div>
         <div className="h-14 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4">
             <div className="flex items-center text-sm overflow-hidden">
                 {/* Mobile hamburger menu */}
@@ -213,6 +214,27 @@ export const TopBar: React.FC = () => {
                     </div>
                 )}
             </div>
+        </div>
+
+        {/* Connect mode instruction banner */}
+        {connectMode.active && (
+            <div className="bg-purple-900/50 border-b border-purple-800 px-4 py-1.5 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-purple-200">
+                    <Link className="w-3.5 h-3.5 animate-pulse" />
+                    <span>
+                        {connectMode.sourceNodeId
+                            ? 'Tap a target node to create a connection'
+                            : 'Tap a source node to start connecting'}
+                    </span>
+                </div>
+                <button
+                    onClick={toggleConnectMode}
+                    className="text-xs text-purple-300 hover:text-white px-2 py-0.5 rounded bg-purple-800/50 hover:bg-purple-700/50 transition-colors"
+                >
+                    Cancel
+                </button>
+            </div>
+        )}
         </div>
     );
 };
