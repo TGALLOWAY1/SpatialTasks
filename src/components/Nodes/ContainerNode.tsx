@@ -245,10 +245,12 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                             />
                         ) : (
                             <span
-                                className="font-bold text-sm text-indigo-100 break-words whitespace-pre-wrap"
+                                className="font-bold text-sm text-indigo-100 break-words whitespace-pre-wrap cursor-text group/title"
                                 onDoubleClick={handleTitleDoubleClick}
+                                title="Double-click to edit"
                             >
                                 {data.title}
+                                <Pencil className="w-3 h-3 text-indigo-400 opacity-0 group-hover/title:opacity-100 inline-block ml-1 align-middle transition-opacity" />
                             </span>
                         )}
                     </div>

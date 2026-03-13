@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { ChevronRight, Home, PlayCircle, StopCircle, Undo2, Redo2, Trash2, BoxSelect, Link, Menu, LayoutGrid, List } from 'lucide-react';
+import { ChevronRight, Home, Undo2, Redo2, Trash2, BoxSelect, Link, Menu, LayoutGrid, List, MoreVertical, Eye, Zap } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useStore } from 'zustand';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
+import { SaveIndicator } from '../UI/SaveIndicator';
 
 export const TopBar: React.FC = () => {
     const { isTouchDevice } = useDeviceDetect();
@@ -22,7 +23,27 @@ export const TopBar: React.FC = () => {
 
     const { undo, redo, pastStates, futureStates } = useStore(useWorkspaceStore.temporal);
 
+    const [overflowOpen, setOverflowOpen] = useState(false);
+    const overflowRef = useRef<HTMLDivElement>(null);
+
+    // Close overflow menu when clicking outside
+    useEffect(() => {
+        if (!overflowOpen) return;
+        const handleClick = (e: Event) => {
+            if (overflowRef.current && !overflowRef.current.contains(e.target as HTMLElement)) {
+                setOverflowOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClick);
+        document.addEventListener('touchstart', handleClick);
+        return () => {
+            document.removeEventListener('mousedown', handleClick);
+            document.removeEventListener('touchstart', handleClick);
+        };
+    }, [overflowOpen]);
+
     return (
+        <div>
         <div className="h-14 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4">
             <div className="flex items-center text-sm overflow-hidden">
                 {/* Mobile hamburger menu */}
@@ -44,13 +65,20 @@ export const TopBar: React.FC = () => {
                                 }`}
                         >
                             {index === 0 && <Home className="w-4 h-4 mr-1" />}
-                            <span className="truncate max-w-[100px] touch:max-w-[60px]">{item.label}</span>
+                            <span className="truncate max-w-[120px] touch:max-w-[80px]">{item.label}</span>
                         </button>
                     </React.Fragment>
                 ))}
+                {/* Depth indicator for deep navigation */}
+                {navStack.length > 2 && (
+                    <span className="ml-1 text-[10px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                        L{navStack.length - 1}
+                    </span>
+                )}
             </div>
 
             <div className="flex items-center gap-1 touch:gap-0">
+                <SaveIndicator />
                 {/* View mode toggle: Graph / List */}
                 <div className="flex items-center bg-gray-800 rounded-lg p-0.5 mr-1">
                     <button
@@ -79,85 +107,134 @@ export const TopBar: React.FC = () => {
                     </button>
                 </div>
 
-                <button
-                    onClick={() => undo()}
-                    disabled={pastStates.length === 0}
-                    className="p-1.5 touch:px-2 touch:py-1 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors touch:min-h-[44px] touch:flex touch:flex-col touch:items-center touch:justify-center"
-                    title="Undo (Ctrl+Z)"
-                >
-                    <Undo2 className="w-4 h-4" />
-                    {isTouchDevice && <span className="text-[9px] leading-tight mt-0.5">Undo</span>}
-                </button>
-                <button
-                    onClick={() => redo()}
-                    disabled={futureStates.length === 0}
-                    className="p-1.5 touch:px-2 touch:py-1 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors touch:min-h-[44px] touch:flex touch:flex-col touch:items-center touch:justify-center"
-                    title="Redo (Ctrl+Shift+Z)"
-                >
-                    <Redo2 className="w-4 h-4" />
-                    {isTouchDevice && <span className="text-[9px] leading-tight mt-0.5">Redo</span>}
-                </button>
-
-                {/* Mobile-only: Delete selected */}
-                {isTouchDevice && (
-                    <button
-                        onClick={() => document.dispatchEvent(new CustomEvent('canvas:delete-selected'))}
-                        disabled={!hasSelection}
-                        className="px-2 py-1 rounded text-gray-400 hover:text-red-400 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors min-h-[44px] flex flex-col items-center justify-center"
-                        title="Delete selected"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        <span className="text-[9px] leading-tight mt-0.5">Delete</span>
-                    </button>
+                {/* Desktop: show all buttons inline */}
+                {!isTouchDevice && (
+                    <>
+                        <button
+                            onClick={() => undo()}
+                            disabled={pastStates.length === 0}
+                            className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title="Undo (Ctrl+Z)"
+                        >
+                            <Undo2 className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => redo()}
+                            disabled={futureStates.length === 0}
+                            className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title="Redo (Ctrl+Shift+Z)"
+                        >
+                            <Redo2 className="w-4 h-4" />
+                        </button>
+                    </>
                 )}
 
-                {/* Mobile-only: Select mode toggle */}
-                {isTouchDevice && (
-                    <button
-                        onClick={toggleSelectMode}
-                        className={clsx(
-                            "px-2 py-1 rounded transition-colors min-h-[44px] flex flex-col items-center justify-center",
-                            selectMode
-                                ? "text-purple-400 bg-purple-500/20"
-                                : "text-gray-400 hover:text-white hover:bg-gray-700"
-                        )}
-                        title={selectMode ? "Pan mode" : "Select mode"}
-                    >
-                        <BoxSelect className="w-4 h-4" />
-                        <span className="text-[9px] leading-tight mt-0.5">{selectMode ? 'Select' : 'Select'}</span>
-                    </button>
-                )}
-
-                {/* Mobile-only: Connect mode toggle */}
-                {isTouchDevice && (
-                    <button
-                        onClick={toggleConnectMode}
-                        className={clsx(
-                            "px-2 py-1 rounded transition-colors min-h-[44px] flex flex-col items-center justify-center",
-                            connectMode.active
-                                ? "text-purple-400 bg-purple-500/20"
-                                : "text-gray-400 hover:text-white hover:bg-gray-700"
-                        )}
-                        title={connectMode.active ? "Cancel connect" : "Connect nodes"}
-                    >
-                        <Link className="w-4 h-4" />
-                        <span className="text-[9px] leading-tight mt-0.5">Link</span>
-                    </button>
-                )}
-
+                {/* Execution mode toggle — always visible */}
                 <button
                     onClick={toggleExecutionMode}
                     className={clsx(
-                        "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold transition-all touch:flex-col touch:gap-0.5 touch:px-2 touch:py-1 touch:rounded-lg touch:text-xs",
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all touch:px-2 touch:py-1 touch:rounded-lg",
                         executionMode
                             ? "bg-amber-500/20 text-amber-500 border border-amber-500/50 hover:bg-amber-500/30"
                             : "bg-gray-800 text-gray-400 border border-gray-700 hover:text-white hover:bg-gray-700"
                     )}
+                    title={executionMode ? "Currently in Execution Mode — click to switch to Planning" : "Currently in Plan Mode — click to switch to Execution"}
                 >
-                    {executionMode ? <StopCircle className="w-4 h-4 fill-current" /> : <PlayCircle className="w-4 h-4" />}
-                    <span className="hidden touch:inline touch:text-[9px] touch:leading-tight sm:inline sm:text-sm">{executionMode ? "Run" : "Plan"}</span>
+                    {executionMode ? <Zap className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    <span className="hidden sm:inline text-sm">{executionMode ? "Executing" : "Planning"}</span>
+                </button>
+
+                {/* Mobile: overflow menu for secondary actions */}
+                {isTouchDevice && (
+                    <div className="relative" ref={overflowRef}>
+                        <button
+                            onClick={() => setOverflowOpen(!overflowOpen)}
+                            className={clsx(
+                                "p-2 rounded transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center",
+                                overflowOpen ? "text-white bg-gray-700" : "text-gray-400 hover:text-white hover:bg-gray-700"
+                            )}
+                            title="More actions"
+                        >
+                            <MoreVertical className="w-5 h-5" />
+                        </button>
+                        {overflowOpen && (
+                            <div className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 py-1 min-w-[180px]">
+                                <button
+                                    onClick={() => { undo(); setOverflowOpen(false); }}
+                                    disabled={pastStates.length === 0}
+                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 hover:bg-gray-700 transition-colors"
+                                >
+                                    <Undo2 className="w-4 h-4 flex-shrink-0" />
+                                    Undo
+                                </button>
+                                <button
+                                    onClick={() => { redo(); setOverflowOpen(false); }}
+                                    disabled={futureStates.length === 0}
+                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 hover:bg-gray-700 transition-colors"
+                                >
+                                    <Redo2 className="w-4 h-4 flex-shrink-0" />
+                                    Redo
+                                </button>
+
+                                <div className="border-t border-gray-700 my-1" />
+
+                                <button
+                                    onClick={() => { document.dispatchEvent(new CustomEvent('canvas:delete-selected')); setOverflowOpen(false); }}
+                                    disabled={!hasSelection}
+                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left disabled:opacity-30 disabled:cursor-not-allowed text-red-400 hover:bg-gray-700 transition-colors"
+                                >
+                                    <Trash2 className="w-4 h-4 flex-shrink-0" />
+                                    Delete Selected
+                                </button>
+
+                                <div className="border-t border-gray-700 my-1" />
+
+                                <button
+                                    onClick={() => { toggleSelectMode(); setOverflowOpen(false); }}
+                                    className={clsx(
+                                        "flex items-center gap-3 w-full px-4 py-3 text-sm text-left hover:bg-gray-700 transition-colors",
+                                        selectMode ? "text-purple-400" : "text-gray-300"
+                                    )}
+                                >
+                                    <BoxSelect className="w-4 h-4 flex-shrink-0" />
+                                    {selectMode ? 'Exit Select Mode' : 'Select Mode'}
+                                </button>
+                                <button
+                                    onClick={() => { toggleConnectMode(); setOverflowOpen(false); }}
+                                    className={clsx(
+                                        "flex items-center gap-3 w-full px-4 py-3 text-sm text-left hover:bg-gray-700 transition-colors",
+                                        connectMode.active ? "text-purple-400" : "text-gray-300"
+                                    )}
+                                >
+                                    <Link className="w-4 h-4 flex-shrink-0" />
+                                    {connectMode.active ? 'Cancel Connect' : 'Connect Nodes'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+
+        {/* Connect mode instruction banner */}
+        {connectMode.active && (
+            <div className="bg-purple-900/50 border-b border-purple-800 px-4 py-1.5 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-purple-200">
+                    <Link className="w-3.5 h-3.5 animate-pulse" />
+                    <span>
+                        {connectMode.sourceNodeId
+                            ? 'Tap a target node to create a connection'
+                            : 'Tap a source node to start connecting'}
+                    </span>
+                </div>
+                <button
+                    onClick={toggleConnectMode}
+                    className="text-xs text-purple-300 hover:text-white px-2 py-0.5 rounded bg-purple-800/50 hover:bg-purple-700/50 transition-colors"
+                >
+                    Cancel
                 </button>
             </div>
+        )}
         </div>
     );
 };

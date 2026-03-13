@@ -134,14 +134,16 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                 ) : (
                     <span
                         className={clsx(
-                            "font-medium text-sm text-slate-200 break-words whitespace-pre-wrap",
+                            "font-medium text-sm text-slate-200 break-words whitespace-pre-wrap cursor-text group/title relative flex-1",
                             data.status === 'done' && "line-through text-slate-400",
                             isBlocked && "text-slate-500",
                             highlight && "text-amber-100 font-bold"
                         )}
                         onDoubleClick={handleDoubleClick}
+                        title="Double-click to edit"
                     >
                         {data.title}
+                        <Pencil className="w-3 h-3 text-slate-500 opacity-0 group-hover/title:opacity-100 inline-block ml-1 align-middle transition-opacity" />
                     </span>
                 )}
             </div>

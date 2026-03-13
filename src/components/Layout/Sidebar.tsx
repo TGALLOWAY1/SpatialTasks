@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useAuthStore } from '../../store/authStore';
 import { useToastStore } from '../UI/Toast';
+import { ConfirmModal } from '../UI/ConfirmModal';
 import { supabase } from '../../lib/supabase';
 import { clsx } from 'clsx';
 import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus } from 'lucide-react';
@@ -28,6 +29,7 @@ export const Sidebar: React.FC = () => {
     const [changingPassword, setChangingPassword] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
     const [newProjectTitle, setNewProjectTitle] = useState('');
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
 
     const geminiStatus = settings.geminiStatus || (settings.geminiApiKey ? 'configured' : 'no_key');
 
@@ -293,11 +295,11 @@ export const Sidebar: React.FC = () => {
                             </div>
                         )}
                         <button
-                            onClick={() => resetWorkspace(Math.random().toString())}
-                            className="flex items-center gap-2 text-xs text-gray-500 hover:text-white w-full px-2 py-2"
+                            onClick={() => setShowResetConfirm(true)}
+                            className="flex items-center gap-2 text-xs text-gray-500 hover:text-red-400 w-full px-2 py-2"
                         >
                             <RefreshCw className="w-3 h-3" />
-                            Regenerate Data
+                            Reset to Demo Data
                         </button>
                         <button
                             onClick={() => supabase.auth.signOut()}
@@ -312,21 +314,44 @@ export const Sidebar: React.FC = () => {
         </div>
     );
 
+    const resetConfirmModal = showResetConfirm ? (
+        <ConfirmModal
+            title="Reset to Demo Data"
+            message="This will delete all your projects and replace them with sample data. This cannot be undone."
+            confirmLabel="Reset Everything"
+            danger
+            onConfirm={() => {
+                resetWorkspace(Math.random().toString());
+                setShowResetConfirm(false);
+                addToast('Workspace reset to demo data.', 'info');
+            }}
+            onCancel={() => setShowResetConfirm(false)}
+        />
+    ) : null;
+
     if (isMobile) {
         return (
-            <div className="fixed inset-0 z-[80] flex">
-                {/* Backdrop */}
-                <div
-                    className="absolute inset-0 bg-black/50"
-                    onClick={closeSidebar}
-                />
-                {/* Drawer */}
-                <div className="relative z-10 animate-slide-in-left">
-                    {sidebarContent}
+            <>
+                <div className="fixed inset-0 z-[80] flex">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-black/50"
+                        onClick={closeSidebar}
+                    />
+                    {/* Drawer */}
+                    <div className="relative z-10 animate-slide-in-left">
+                        {sidebarContent}
+                    </div>
                 </div>
-            </div>
+                {resetConfirmModal}
+            </>
         );
     }
 
-    return sidebarContent;
+    return (
+        <>
+            {sidebarContent}
+            {resetConfirmModal}
+        </>
+    );
 };

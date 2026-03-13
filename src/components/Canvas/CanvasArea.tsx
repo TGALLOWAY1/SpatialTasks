@@ -2,6 +2,7 @@ import React, { useMemo, useCallback, useEffect, useState, useRef } from 'react'
 import ReactFlow, {
     Background,
     Controls,
+    MiniMap,
     Node as RFNode,
     Edge as RFEdge,
     NodeChange,
@@ -18,7 +19,7 @@ import { ContextMenu, MenuItem } from '../UI/ContextMenu';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { ActionSheet } from '../UI/ActionSheet';
 import { FloatingActionButton } from '../UI/FloatingActionButton';
-import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers } from 'lucide-react';
+import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick } from 'lucide-react';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
 const nodeTypes = {
@@ -583,7 +584,37 @@ const CanvasInner: React.FC = () => {
             >
                 <Background color="#374151" gap={20} />
                 <Controls className="bg-gray-800 border-gray-700 fill-gray-100" />
+                {!isTouchDevice && (
+                    <MiniMap
+                        nodeColor={(node) => node.type === 'container' ? '#4338ca' : '#334155'}
+                        maskColor="rgba(0, 0, 0, 0.7)"
+                        style={{
+                            backgroundColor: '#111827',
+                            border: '1px solid #374151',
+                            borderRadius: 8,
+                        }}
+                        pannable
+                        zoomable
+                    />
+                )}
             </ReactFlow>
+
+            {/* Empty state guidance */}
+            {graph.nodes.length === 0 && !quickAdd && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                    <div className="text-center space-y-3 max-w-xs">
+                        <MousePointerClick className="w-10 h-10 text-gray-600 mx-auto" />
+                        <p className="text-gray-400 text-sm font-medium">
+                            {isTouchDevice ? 'Tap the + button to add a task' : 'Double-click to add a task'}
+                        </p>
+                        <p className="text-gray-600 text-xs">
+                            {isTouchDevice
+                                ? 'Or long-press the canvas for more options'
+                                : 'Or right-click for more options like creating containers'}
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Context menu */}
             {contextMenu && (
