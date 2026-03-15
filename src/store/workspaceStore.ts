@@ -34,6 +34,7 @@ interface WorkspaceState extends Workspace {
 
     // Project management
     createProject: (title: string) => void;
+    deleteProject: (projectId: string) => void;
 
     // Graph edits
     addNode: (node: Node) => void;
@@ -195,6 +196,48 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     navStack: [{ graphId: rootGraphId, label: title }],
                     executionMode: false,
                 });
+            },
+
+            deleteProject: (projectId) => {
+                const { projects, graphs, activeProjectId } = get();
+                const project = projects.find(p => p.id === projectId);
+                if (!project || projects.length <= 1) return; // Prevent deleting the last project
+
+                // Collect all graph IDs belonging to this project
+                const graphIdsToDelete: string[] = [];
+                const collectDescendantGraphIds = (graphId: string) => {
+                    const g = graphs[graphId];
+                    if (!g) return;
+                    graphIdsToDelete.push(graphId);
+                    g.nodes.forEach(n => {
+                        if (n.childGraphId) collectDescendantGraphIds(n.childGraphId);
+                    });
+                };
+                collectDescendantGraphIds(project.rootGraphId);
+
+                // Remove graphs
+                const updatedGraphs = { ...graphs };
+                graphIdsToDelete.forEach(id => delete updatedGraphs[id]);
+
+                // Remove project
+                const updatedProjects = projects.filter(p => p.id !== projectId);
+
+                // If deleting the active project, switch to another one
+                const updates: Partial<WorkspaceState> = {
+                    projects: updatedProjects,
+                    graphs: updatedGraphs,
+                };
+
+                if (activeProjectId === projectId) {
+                    const next = updatedProjects[0];
+                    const nextRoot = updatedGraphs[next.rootGraphId];
+                    updates.activeProjectId = next.id;
+                    updates.activeGraphId = next.rootGraphId;
+                    updates.navStack = [{ graphId: nextRoot.id, label: nextRoot.title }];
+                    updates.executionMode = false;
+                }
+
+                set(updates);
             },
 
             addNode: (node) => {
