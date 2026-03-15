@@ -16,6 +16,7 @@ export const Sidebar: React.FC = () => {
     const activeProjectId = useWorkspaceStore(state => state.activeProjectId);
     const loadProject = useWorkspaceStore(state => state.loadProject);
     const createProject = useWorkspaceStore(state => state.createProject);
+    const deleteProject = useWorkspaceStore(state => state.deleteProject);
     const resetWorkspace = useWorkspaceStore(state => state.resetWorkspace);
     const settings = useWorkspaceStore(state => state.settings);
     const updateSettings = useWorkspaceStore(state => state.updateSettings);
@@ -30,6 +31,7 @@ export const Sidebar: React.FC = () => {
     const [isCreating, setIsCreating] = useState(false);
     const [newProjectTitle, setNewProjectTitle] = useState('');
     const [showResetConfirm, setShowResetConfirm] = useState(false);
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
     const geminiStatus = settings.geminiStatus || (settings.geminiApiKey ? 'configured' : 'no_key');
 
@@ -271,18 +273,28 @@ export const Sidebar: React.FC = () => {
                                 </form>
                             )}
                             {projects.map(project => (
-                                <button
-                                    key={project.id}
-                                    onClick={() => { loadProject(project.id); if (isMobile) closeSidebar(); }}
-                                    className={clsx(
-                                        "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                                        activeProjectId === project.id
-                                            ? "bg-purple-900/30 text-purple-300 border border-purple-800"
-                                            : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                                <div key={project.id} className="group relative flex items-center">
+                                    <button
+                                        onClick={() => { loadProject(project.id); if (isMobile) closeSidebar(); }}
+                                        className={clsx(
+                                            "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
+                                            activeProjectId === project.id
+                                                ? "bg-purple-900/30 text-purple-300 border border-purple-800"
+                                                : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                                        )}
+                                    >
+                                        {project.title}
+                                    </button>
+                                    {projects.length > 1 && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(project.id); }}
+                                            className="absolute right-1 p-1 rounded text-gray-600 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-gray-800 transition-all"
+                                            title="Delete project"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
                                     )}
-                                >
-                                    {project.title}
-                                </button>
+                                </div>
                             ))}
                         </div>
                     </div>
@@ -314,6 +326,22 @@ export const Sidebar: React.FC = () => {
         </div>
     );
 
+    const deleteConfirmProject = deleteConfirmId ? projects.find(p => p.id === deleteConfirmId) : null;
+    const deleteConfirmModal = deleteConfirmProject ? (
+        <ConfirmModal
+            title="Delete Project"
+            message={`Delete "${deleteConfirmProject.title}" and all its contents? This cannot be undone.`}
+            confirmLabel="Delete Project"
+            danger
+            onConfirm={() => {
+                deleteProject(deleteConfirmProject.id);
+                setDeleteConfirmId(null);
+                addToast(`Deleted "${deleteConfirmProject.title}"`, 'info');
+            }}
+            onCancel={() => setDeleteConfirmId(null)}
+        />
+    ) : null;
+
     const resetConfirmModal = showResetConfirm ? (
         <ConfirmModal
             title="Reset to Demo Data"
@@ -344,6 +372,7 @@ export const Sidebar: React.FC = () => {
                     </div>
                 </div>
                 {resetConfirmModal}
+                {deleteConfirmModal}
             </>
         );
     }
@@ -352,6 +381,7 @@ export const Sidebar: React.FC = () => {
         <>
             {sidebarContent}
             {resetConfirmModal}
+            {deleteConfirmModal}
         </>
     );
 };
