@@ -332,7 +332,7 @@ export const Sidebar: React.FC = () => {
     if (isMobile) {
         return (
             <>
-                <div className="fixed inset-0 z-[80] flex">
+                <div className="fixed inset-0 z-[80] flex" style={{ paddingTop: 'var(--sat, 0px)' }}>
                     {/* Backdrop */}
                     <div
                         className="absolute inset-0 bg-black/50"
