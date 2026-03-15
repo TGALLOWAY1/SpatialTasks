@@ -96,9 +96,9 @@ const CanvasInner: React.FC = () => {
             id: e.id,
             source: e.source,
             target: e.target,
-            type: 'default',
+            type: 'smoothstep',
             animated: !isTouchDevice,
-            style: { stroke: '#4b5563' }
+            style: { stroke: '#4b5563', strokeWidth: 2 },
         }));
     }, [graph, isTouchDevice]);
 
