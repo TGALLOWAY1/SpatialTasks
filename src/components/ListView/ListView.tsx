@@ -121,7 +121,7 @@ const ActionItem: React.FC<{ node: Node; blocked: boolean; depth: number; isPara
             style={{ marginLeft: depth * 24 }}
         >
             {isParallel && (
-                <GitBranch className="w-3.5 h-3.5 text-purple-400 flex-shrink-0 -rotate-90" title="Runs in parallel" />
+                <GitBranch className="w-3.5 h-3.5 text-purple-400 flex-shrink-0 -rotate-90" />
             )}
             <button
                 onClick={handleStatusClick}
@@ -293,7 +293,7 @@ const ContainerItem: React.FC<{
                 </button>
 
                 {isParallel && (
-                    <GitBranch className="w-3.5 h-3.5 text-purple-400 flex-shrink-0 -rotate-90" title="Runs in parallel" />
+                    <GitBranch className="w-3.5 h-3.5 text-purple-400 flex-shrink-0 -rotate-90" />
                 )}
 
                 <Layers className="w-5 h-5 text-indigo-400 flex-shrink-0" />
