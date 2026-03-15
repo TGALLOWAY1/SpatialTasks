@@ -222,7 +222,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                 )}
             </NodeResizeControl>
 
-            <Handle type="target" position={Position.Left} className="w-3 h-3 bg-indigo-400" />
+            <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-indigo-400 !top-1/2 !-translate-y-1/2" />
 
             <div className="flex flex-col gap-2">
                 <div className="flex items-start justify-between border-b border-indigo-800 pb-2 mb-1">
@@ -312,7 +312,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                 />
             </div>
 
-            <Handle type="source" position={Position.Right} className="w-3 h-3 bg-indigo-400" />
+            <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-indigo-400 !top-1/2 !-translate-y-1/2" />
 
             {showExpandConfirm && (
                 <ConfirmModal

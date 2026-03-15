@@ -103,7 +103,7 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                 )}
             </NodeResizeControl>
 
-            <Handle type="target" position={Position.Left} className="w-3 h-3 bg-slate-400" />
+            <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-slate-400 !top-1/2 !-translate-y-1/2" />
 
             <div className="flex items-start gap-2">
                 <button
@@ -175,7 +175,7 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                 </div>
             )}
 
-            <Handle type="source" position={Position.Right} className="w-3 h-3 bg-slate-400" />
+            <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-slate-400 !top-1/2 !-translate-y-1/2" />
         </div>
     );
 });
