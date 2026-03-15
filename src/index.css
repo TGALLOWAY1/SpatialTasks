@@ -17,6 +17,7 @@ html, body, #root {
   /* Prevent iOS Safari bounce scroll when modals/sheets are open */
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
+  background: #000;
 }
 
 /* ReactFlow controls — dark theme override */

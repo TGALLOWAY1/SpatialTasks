@@ -28,7 +28,7 @@ function App() {
     }
 
     return (
-        <div className="flex w-screen h-screen overflow-hidden bg-black text-white font-sans selection:bg-purple-500/30">
+        <div className="flex w-screen h-screen overflow-hidden bg-black text-white font-sans selection:bg-purple-500/30" style={{ paddingTop: 'var(--sat, 0px)' }}>
             <Sidebar />
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
                 <TopBar />
