@@ -1,7 +1,7 @@
 import { memo, useMemo, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps, NodeResizeControl } from 'reactflow';
 import { Node } from '../../types';
-import { CheckCircle2, Circle, Clock, Lock, ArrowBigRightDash, Pencil, GripVertical, StickyNote, SkipForward } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Lock, Pencil, GripVertical, StickyNote, SkipForward } from 'lucide-react';
 import { NotesEditor } from './NotesEditor';
 import { clsx } from 'clsx';
 import { useWorkspaceStore } from '../../store/workspaceStore';
