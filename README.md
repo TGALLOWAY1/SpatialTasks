@@ -6,19 +6,47 @@ A spatial, node-based task management system. Organize projects as connected nod
 
 ## Features
 
+### Core
+
 - **Spatial Canvas** — Drag-and-drop nodes on an infinite canvas with pan and zoom
-- **Nested Subflows** — Open container nodes to dive into nested workspaces
-- **Visual Progress** — Track completion with progress rings and status indicators
-- **Execution Mode** — Highlights actionable next steps and dims completed/blocked work
-- **Dependency Tracking** — Edges between nodes enforce task ordering
-- **Magic Expand (AI)** — Optionally use your own Gemini API key to auto-decompose tasks into subtask subflows
-- **Persistent State** — All work is saved locally in the browser
+- **Nested Subflows** — Open container nodes to dive into nested workspaces with breadcrumb navigation
+- **Dependency Tracking** — Edges between nodes enforce task ordering; blocked nodes are visually indicated
+- **Visual Progress** — Track completion with progress rings, status indicators, and progress bars on containers
+- **Execution Mode** — Highlights actionable next steps, dims completed/blocked work, and provides a "Next" button to advance through your flow
+- **Resizable Nodes** — Drag the right edge of any node to resize it
+- **List View** — Toggle between spatial graph view and a flat list view for quick scanning
+- **Node Notes** — Attach notes to any node with copy-to-clipboard and full-screen expand support
+- **Undo / Redo** — Full undo/redo history (Ctrl+Z / Ctrl+Shift+Z)
+- **Persistent State** — All work is saved locally in the browser with a live save indicator
+
+### AI Features
+
+- **Magic Expand** — Use your own Gemini API key to auto-decompose container nodes into subtask subflows with dependencies
+- **AI Starter Flows** — Generate a complete project flow from a description using AI when starting a new project
+
+### Project Management
+
+- **Multiple Projects** — Create, switch between, and delete projects from the sidebar
+- **New Project Button** — Quick-create projects from the sidebar
+
+### iPhone & Mobile
+
+- **Touch-Optimized** — 44pt minimum touch targets, long-press context menus, floating action button for quick task creation
+- **Tap-to-Connect** — Create edges between nodes by tapping source then target in connect mode
+- **Tap-to-Zoom** — Tapping a node auto-zooms to show it and its immediate successors
+- **View Full Flow** — Floating button to zoom out and see the entire diagram at once
+- **Swipe-to-Navigate** — Swipe right from the left edge to go back up the breadcrumb
+- **Responsive Header** — View toggle and secondary actions collapse into an overflow menu on small screens
+- **Haptic Feedback** — Subtle vibration on status changes and navigation
+- **iOS Safe Areas** — Proper insets for notch, home indicator, and virtual keyboard
+- **Slide-Over Sidebar** — Sidebar renders as a drawer overlay on mobile
+- **Pinch-to-Zoom Preferred** — Canvas zoom controls are hidden on mobile in favor of native gestures
 
 ## Tech Stack
 
 - React 18 + TypeScript
 - ReactFlow (node-flow canvas)
-- Zustand (state management with localStorage persistence)
+- Zustand (state management with localStorage persistence + undo/redo via zundo)
 - Tailwind CSS
 - Vite
 
@@ -31,7 +59,7 @@ npm run dev
 
 ## Gemini AI Setup (Optional)
 
-SpatialTasks supports an optional AI feature called **Magic Expand** that uses Google's Gemini 2.5 Flash to automatically break down a task into subtasks. This is a bring-your-own-key (BYOK) feature — no API key is required for core functionality.
+SpatialTasks supports optional AI features that use Google's Gemini 2.5 Flash. This is a bring-your-own-key (BYOK) feature — no API key is required for core functionality.
 
 ### Step 1: Get a Gemini API Key
 
