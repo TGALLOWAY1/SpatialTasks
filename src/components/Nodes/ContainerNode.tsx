@@ -290,9 +290,13 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
             </div>
 
             {highlight && (
-                <div className="absolute -top-3 -right-2 bg-amber-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full animate-bounce shadow-lg z-20">
+                <button
+                    onClick={handleEnter}
+                    className="absolute -top-3 -right-2 bg-amber-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full animate-bounce shadow-lg z-20 hover:bg-amber-400 active:scale-95 transition-transform min-h-[28px] flex items-center gap-1"
+                >
+                    <ArrowBigRightDash className="w-3 h-3" />
                     Dive In
-                </div>
+                </button>
             )}
 
             {/* Touch: floating Edit Title button when selected */}
@@ -315,14 +319,15 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                 <button
                     onClick={(e) => { e.stopPropagation(); setShowNotes(v => !v); }}
                     className={clsx(
-                        "absolute -bottom-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center shadow-md transition-colors z-20",
+                        "absolute rounded-full flex items-center justify-center shadow-md transition-colors z-20",
+                        isTouchDevice ? "w-9 h-9 -bottom-3 -right-3" : "w-6 h-6 -bottom-2 -right-2",
                         data.meta?.notes
                             ? "bg-amber-600 text-amber-100 hover:bg-amber-500"
                             : "bg-indigo-700 text-indigo-300 hover:bg-indigo-600 hover:text-indigo-100"
                     )}
                     title={data.meta?.notes ? "View notes" : "Add notes"}
                 >
-                    <StickyNote className="w-3 h-3" />
+                    <StickyNote className={isTouchDevice ? "w-4 h-4" : "w-3 h-3"} />
                 </button>
             )}
 

@@ -19,8 +19,9 @@ import { ContextMenu, MenuItem } from '../UI/ContextMenu';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { ActionSheet } from '../UI/ActionSheet';
 import { FloatingActionButton } from '../UI/FloatingActionButton';
-import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Sparkles } from 'lucide-react';
+import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Sparkles, Maximize2 } from 'lucide-react';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
+import { isNodeActionable } from '../../utils/logic';
 
 const nodeTypes = {
     container: ContainerNode,
@@ -37,6 +38,8 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
 
     const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
     const graphs = useWorkspaceStore(state => state.graphs);
+    const navStack = useWorkspaceStore(state => state.navStack);
+    const navigateBack = useWorkspaceStore(state => state.navigateBack);
     const updateNode = useWorkspaceStore(state => state.updateNode);
     const removeNode = useWorkspaceStore(state => state.removeNode);
     const removeEdge = useWorkspaceStore(state => state.removeEdge);
@@ -204,6 +207,60 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         return () => document.removeEventListener('canvas:delete-selected', handler);
     }, [deleteSelected]);
 
+    // Listen for fit-view event (from TopBar overflow menu)
+    const handleFitView = useCallback(() => {
+        reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+    }, [reactFlowInstance]);
+
+    useEffect(() => {
+        document.addEventListener('canvas:fit-view', handleFitView);
+        return () => document.removeEventListener('canvas:fit-view', handleFitView);
+    }, [handleFitView]);
+
+    // Listen for advance-next event (from execution mode Next button)
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const fromNodeId = (e as CustomEvent).detail?.fromNodeId;
+            if (!activeGraphId) return;
+
+            // Small delay to let the status update propagate
+            setTimeout(() => {
+                const currentGraph = graphs[activeGraphId];
+                if (!currentGraph) return;
+
+                // Find the next actionable node
+                const nextNode = currentGraph.nodes.find(n =>
+                    n.id !== fromNodeId && isNodeActionable(n, currentGraph)
+                );
+
+                if (nextNode) {
+                    const rfNodes = reactFlowInstance.getNodes();
+                    const rfNode = rfNodes.find(n => n.id === nextNode.id);
+                    if (rfNode) {
+                        // Find successors of the next node too
+                        const successorIds = currentGraph.edges
+                            .filter(edge => edge.source === nextNode.id)
+                            .map(edge => edge.target);
+                        const nodesToFit = rfNodes.filter(n =>
+                            n.id === nextNode.id || successorIds.includes(n.id)
+                        );
+                        reactFlowInstance.fitView({
+                            nodes: nodesToFit,
+                            padding: 0.4,
+                            duration: 400,
+                            maxZoom: 1.5,
+                        });
+                    }
+                } else {
+                    // No more actionable nodes — zoom out to show full flow
+                    reactFlowInstance.fitView({ padding: 0.2, duration: 400 });
+                }
+            }, 100);
+        };
+        document.addEventListener('canvas:advance-next', handler);
+        return () => document.removeEventListener('canvas:advance-next', handler);
+    }, [activeGraphId, graphs, reactFlowInstance]);
+
     // (hasSelection tracked via store's setHasSelection)
 
     // Double-click canvas to add node
@@ -220,30 +277,50 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         });
     }, [reactFlowInstance]);
 
-    // Node click handler — handles connect mode tap-to-connect
+    // Node click handler — handles connect mode tap-to-connect + mobile zoom-to-node
     const handleNodeClick = useCallback((_event: React.MouseEvent, node: RFNode) => {
-        if (!connectMode.active || !activeGraphId) return;
+        if (connectMode.active && activeGraphId) {
+            if (!connectMode.sourceNodeId) {
+                setConnectSource(node.id);
+            } else if (connectMode.sourceNodeId !== node.id) {
+                const g = graphs[activeGraphId];
+                const exists = g.edges.some(
+                    e => e.source === connectMode.sourceNodeId && e.target === node.id
+                );
+                if (!exists) {
+                    addEdge({
+                        id: uuidv4(),
+                        graphId: activeGraphId,
+                        source: connectMode.sourceNodeId,
+                        target: node.id,
+                    });
+                }
+                clearConnectMode();
+            }
+            return;
+        }
 
-        if (!connectMode.sourceNodeId) {
-            // First tap: set source
-            setConnectSource(node.id);
-        } else if (connectMode.sourceNodeId !== node.id) {
-            // Second tap: create edge
+        // Mobile: zoom to clicked node + its successors
+        if (isTouchDevice && activeGraphId) {
             const g = graphs[activeGraphId];
-            const exists = g.edges.some(
-                e => e.source === connectMode.sourceNodeId && e.target === node.id
-            );
-            if (!exists) {
-                addEdge({
-                    id: uuidv4(),
-                    graphId: activeGraphId,
-                    source: connectMode.sourceNodeId,
-                    target: node.id,
+            // Find successor node IDs (outgoing edges from this node)
+            const successorIds = g.edges
+                .filter(e => e.source === node.id)
+                .map(e => e.target);
+            // Include clicked node + successors in the fitView
+            const nodeIdsToFit = [node.id, ...successorIds];
+            const rfNodes = reactFlowInstance.getNodes();
+            const nodesToFit = rfNodes.filter(n => nodeIdsToFit.includes(n.id));
+            if (nodesToFit.length > 0) {
+                reactFlowInstance.fitView({
+                    nodes: nodesToFit,
+                    padding: 0.4,
+                    duration: 300,
+                    maxZoom: 1.5,
                 });
             }
-            clearConnectMode();
         }
-    }, [connectMode, activeGraphId, graphs, addEdge, setConnectSource, clearConnectMode]);
+    }, [connectMode, activeGraphId, graphs, addEdge, setConnectSource, clearConnectMode, isTouchDevice, reactFlowInstance]);
 
     // Context menu handlers
     const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: RFNode) => {
@@ -338,6 +415,42 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
             container.removeEventListener('touchmove', handleTouchMove);
         };
     }, [isTouchDevice, startLongPress, clearLongPress, reactFlowInstance]);
+
+    // Swipe-right to go back (navigate up breadcrumb) on touch devices
+    useEffect(() => {
+        if (!isTouchDevice || navStack.length <= 1) return;
+
+        let startX = 0;
+        let startY = 0;
+
+        const handleTouchStart = (e: TouchEvent) => {
+            const touch = e.touches[0];
+            // Only detect swipes starting from the left edge (first 30px)
+            if (touch.clientX > 30) return;
+            startX = touch.clientX;
+            startY = touch.clientY;
+        };
+
+        const handleTouchEnd = (e: TouchEvent) => {
+            if (startX === 0) return;
+            const touch = e.changedTouches[0];
+            const dx = touch.clientX - startX;
+            const dy = Math.abs(touch.clientY - startY);
+            startX = 0;
+            // Require horizontal swipe >80px with minimal vertical movement
+            if (dx > 80 && dy < 50) {
+                navigateBack();
+                try { navigator.vibrate(10); } catch {}
+            }
+        };
+
+        document.addEventListener('touchstart', handleTouchStart, { passive: true });
+        document.addEventListener('touchend', handleTouchEnd, { passive: true });
+        return () => {
+            document.removeEventListener('touchstart', handleTouchStart);
+            document.removeEventListener('touchend', handleTouchEnd);
+        };
+    }, [isTouchDevice, navStack.length, navigateBack]);
 
     // Build action sheet items (reuses same logic as context menu)
     const buildActionSheetItems = useCallback((): MenuItem[] => {
@@ -587,7 +700,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 className="bg-gray-950"
             >
                 <Background color="#374151" gap={20} />
-                <Controls className="bg-gray-800 border-gray-700 fill-gray-100" />
+                {!isTouchDevice && <Controls className="bg-gray-800 border-gray-700 fill-gray-100" />}
                 {!isTouchDevice && (
                     <MiniMap
                         nodeColor={(node) => node.type === 'container' ? '#4338ca' : '#334155'}
@@ -637,6 +750,21 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                     items={buildContextMenuItems()}
                     onClose={() => setContextMenu(null)}
                 />
+            )}
+
+            {/* Mobile: floating fit-view button */}
+            {isTouchDevice && (
+                <button
+                    onClick={handleFitView}
+                    className="fixed z-[80] w-11 h-11 rounded-full bg-gray-800 border border-gray-600 text-gray-300 shadow-lg flex items-center justify-center active:bg-gray-700 active:scale-95 transition-all"
+                    style={{
+                        bottom: 'calc(96px + var(--sab, 0px))',
+                        right: '24px',
+                    }}
+                    title="View full flow"
+                >
+                    <Maximize2 className="w-5 h-5" />
+                </button>
             )}
 
             {/* FAB for quick-add on touch devices */}
