@@ -5,10 +5,14 @@ import { useToastStore } from '../UI/Toast';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { supabase } from '../../lib/supabase';
 import { clsx } from 'clsx';
-import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus } from 'lucide-react';
+import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus, Sparkles } from 'lucide-react';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+    onGenerateFlow?: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow }) => {
     const { isMobile } = useDeviceDetect();
     const sidebarOpen = useWorkspaceStore(state => state.sidebarOpen);
     const closeSidebar = useWorkspaceStore(state => state.closeSidebar);
@@ -230,6 +234,16 @@ export const Sidebar: React.FC = () => {
             ) : (
                 <>
                     <div className="flex-1 overflow-y-auto p-2">
+                        {/* Generate Flow CTA */}
+                        {onGenerateFlow && (
+                            <button
+                                onClick={() => { onGenerateFlow(); if (isMobile) closeSidebar(); }}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 mb-3 rounded-lg text-sm font-medium bg-purple-600/20 border border-purple-700/50 text-purple-300 hover:bg-purple-600/30 hover:text-purple-200 transition-colors"
+                            >
+                                <Sparkles className="w-4 h-4" />
+                                Generate Flow
+                            </button>
+                        )}
                         <div className="flex items-center justify-between mb-2 px-2">
                             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Projects</h3>
                             <button

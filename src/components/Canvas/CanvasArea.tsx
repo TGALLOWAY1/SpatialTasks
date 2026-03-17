@@ -19,7 +19,7 @@ import { ContextMenu, MenuItem } from '../UI/ContextMenu';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { ActionSheet } from '../UI/ActionSheet';
 import { FloatingActionButton } from '../UI/FloatingActionButton';
-import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick } from 'lucide-react';
+import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Sparkles } from 'lucide-react';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
 const nodeTypes = {
@@ -27,7 +27,11 @@ const nodeTypes = {
     action: ActionNode
 };
 
-const CanvasInner: React.FC = () => {
+interface CanvasInnerProps {
+    onGenerateFlow?: () => void;
+}
+
+const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     const { isTouchDevice } = useDeviceDetect();
     const rafRef = useRef<number>(0);
 
@@ -612,6 +616,15 @@ const CanvasInner: React.FC = () => {
                                 ? 'Or long-press the canvas for more options'
                                 : 'Or right-click for more options like creating containers'}
                         </p>
+                        {onGenerateFlow && (
+                            <button
+                                onClick={onGenerateFlow}
+                                className="pointer-events-auto inline-flex items-center gap-2 px-4 py-2.5 mt-2 rounded-lg text-sm font-medium bg-purple-600/20 border border-purple-700/50 text-purple-300 hover:bg-purple-600/30 hover:text-purple-200 transition-colors"
+                            >
+                                <Sparkles className="w-4 h-4" />
+                                Generate Flow with AI
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
@@ -684,10 +697,14 @@ const CanvasInner: React.FC = () => {
     );
 };
 
-export const CanvasArea: React.FC = () => {
+interface CanvasAreaProps {
+    onGenerateFlow?: () => void;
+}
+
+export const CanvasArea: React.FC<CanvasAreaProps> = ({ onGenerateFlow }) => {
     return (
         <ReactFlowProvider>
-            <CanvasInner />
+            <CanvasInner onGenerateFlow={onGenerateFlow} />
         </ReactFlowProvider>
     );
 }

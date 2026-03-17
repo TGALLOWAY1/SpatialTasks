@@ -64,6 +64,24 @@ export interface GeminiSubtask {
     dependsOn: string[];
 }
 
+// AI Flow Generation types
+export interface DraftNode {
+    id: string;
+    label: string;
+    description?: string;
+    children?: DraftNode[];
+    order: number;
+}
+
+export interface FlowDraft {
+    id: string;
+    title: string;
+    sourcePrompt: string;
+    status: 'draft' | 'accepted' | 'discarded';
+    nodes: DraftNode[];
+    createdAt: string;
+}
+
 export interface WorkspaceSettings {
     theme?: 'dark' | 'light';
     geminiApiKey?: string;
