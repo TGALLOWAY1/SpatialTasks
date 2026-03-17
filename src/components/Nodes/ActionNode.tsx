@@ -1,7 +1,8 @@
 import { memo, useMemo, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps, NodeResizeControl } from 'reactflow';
 import { Node } from '../../types';
-import { CheckCircle2, Circle, Clock, Lock, ArrowBigRightDash, Pencil, GripVertical } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Lock, ArrowBigRightDash, Pencil, GripVertical, StickyNote } from 'lucide-react';
+import { NotesEditor } from './NotesEditor';
 import { clsx } from 'clsx';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { isNodeBlocked, isNodeActionable } from '../../utils/logic';
@@ -29,6 +30,7 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
 
     const [editing, setEditing] = useState(false);
     const [editValue, setEditValue] = useState(data.title);
+    const [showNotes, setShowNotes] = useState(false);
 
     const { isBlocked, isActionable } = useMemo(() => {
         if (!activeGraphId) return { isBlocked: false, isActionable: false };
@@ -66,6 +68,10 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
     const handleResize = useCallback((_event: any, params: { width: number }) => {
         updateNode(data.id, { width: Math.round(params.width) });
     }, [data.id, updateNode]);
+
+    const handleSaveNotes = useCallback((notes: string) => {
+        updateNode(data.id, { meta: { ...data.meta, notes } });
+    }, [data.id, data.meta, updateNode]);
 
     return (
         <div
@@ -161,6 +167,30 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                     <Pencil className="w-3 h-3" />
                     Edit
                 </button>
+            )}
+
+            {/* Notes icon — only visible when selected */}
+            {selected && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); setShowNotes(v => !v); }}
+                    className={clsx(
+                        "absolute -bottom-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center shadow-md transition-colors z-20",
+                        data.meta?.notes
+                            ? "bg-amber-600 text-amber-100 hover:bg-amber-500"
+                            : "bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-200"
+                    )}
+                    title={data.meta?.notes ? "View notes" : "Add notes"}
+                >
+                    <StickyNote className="w-3 h-3" />
+                </button>
+            )}
+
+            {showNotes && (
+                <NotesEditor
+                    notes={data.meta?.notes ?? ''}
+                    onSave={handleSaveNotes}
+                    onClose={() => setShowNotes(false)}
+                />
             )}
 
             {isBlocked && (

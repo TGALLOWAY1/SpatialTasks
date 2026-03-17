@@ -1,7 +1,8 @@
 import React, { memo, useMemo, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps, NodeResizeControl } from 'reactflow';
 import { Node as SpatialNode, Graph, Edge } from '../../types';
-import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2, Pencil, GripVertical } from 'lucide-react';
+import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2, Pencil, GripVertical, StickyNote } from 'lucide-react';
+import { NotesEditor } from './NotesEditor';
 import { clsx } from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
 import { useWorkspaceStore } from '../../store/workspaceStore';
@@ -43,6 +44,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
     const [editing, setEditing] = useState(false);
     const [editValue, setEditValue] = useState(data.title);
     const [showExpandConfirm, setShowExpandConfirm] = useState(false);
+    const [showNotes, setShowNotes] = useState(false);
 
     const progress = useMemo(() => {
         return getContainerProgress(data, { graphs } as any);
@@ -76,6 +78,10 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
     const handleResize = useCallback((_event: any, params: { width: number }) => {
         updateNode(data.id, { width: Math.round(params.width) });
     }, [data.id, updateNode]);
+
+    const handleSaveNotes = useCallback((notes: string) => {
+        updateNode(data.id, { meta: { ...data.meta, notes } });
+    }, [data.id, data.meta, updateNode]);
 
     const handleEnter = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -302,6 +308,31 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                     <Pencil className="w-3 h-3" />
                     Edit Title
                 </button>
+            )}
+
+            {/* Notes icon — only visible when selected */}
+            {selected && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); setShowNotes(v => !v); }}
+                    className={clsx(
+                        "absolute -bottom-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center shadow-md transition-colors z-20",
+                        data.meta?.notes
+                            ? "bg-amber-600 text-amber-100 hover:bg-amber-500"
+                            : "bg-indigo-700 text-indigo-300 hover:bg-indigo-600 hover:text-indigo-100"
+                    )}
+                    title={data.meta?.notes ? "View notes" : "Add notes"}
+                >
+                    <StickyNote className="w-3 h-3" />
+                </button>
+            )}
+
+            {showNotes && (
+                <NotesEditor
+                    notes={data.meta?.notes ?? ''}
+                    onSave={handleSaveNotes}
+                    onClose={() => setShowNotes(false)}
+                    accentColor="indigo"
+                />
             )}
 
             {/* Progress bar visual at bottom */}
