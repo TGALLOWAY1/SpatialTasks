@@ -1,7 +1,7 @@
 import { memo, useMemo, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps, NodeResizeControl } from 'reactflow';
 import { Node } from '../../types';
-import { CheckCircle2, Circle, Clock, Lock, ArrowBigRightDash, Pencil, GripVertical, StickyNote } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Lock, Pencil, GripVertical, StickyNote, SkipForward } from 'lucide-react';
 import { NotesEditor } from './NotesEditor';
 import { clsx } from 'clsx';
 import { useWorkspaceStore } from '../../store/workspaceStore';
@@ -50,6 +50,7 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
         e.stopPropagation();
         if (isBlocked) return;
         cycleNodeStatus(data.id);
+        try { navigator.vibrate(10); } catch {}
     }, [isBlocked, cycleNodeStatus, data.id]);
 
     const save = useCallback(() => {
@@ -174,14 +175,15 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                 <button
                     onClick={(e) => { e.stopPropagation(); setShowNotes(v => !v); }}
                     className={clsx(
-                        "absolute -bottom-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center shadow-md transition-colors z-20",
+                        "absolute -bottom-2 -right-2 rounded-full flex items-center justify-center shadow-md transition-colors z-20",
+                        isTouchDevice ? "w-9 h-9 -bottom-3 -right-3" : "w-6 h-6",
                         data.meta?.notes
                             ? "bg-amber-600 text-amber-100 hover:bg-amber-500"
                             : "bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-200"
                     )}
                     title={data.meta?.notes ? "View notes" : "Add notes"}
                 >
-                    <StickyNote className="w-3 h-3" />
+                    <StickyNote className={isTouchDevice ? "w-4 h-4" : "w-3 h-3"} />
                 </button>
             )}
 
@@ -200,9 +202,21 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
             )}
 
             {highlight && (
-                <div className="absolute -top-3 -right-2 bg-amber-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1">
-                    Next <ArrowBigRightDash className="w-3 h-3" />
-                </div>
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        // Mark this node as done
+                        updateNode(data.id, { status: 'done' });
+                        // Haptic feedback
+                        try { navigator.vibrate(10); } catch {}
+                        // Dispatch event to zoom to next actionable node
+                        document.dispatchEvent(new CustomEvent('canvas:advance-next', { detail: { fromNodeId: data.id } }));
+                    }}
+                    className="absolute -top-3 -right-2 bg-amber-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1 hover:bg-amber-400 active:scale-95 transition-transform z-20 min-h-[28px]"
+                >
+                    <SkipForward className="w-3 h-3" />
+                    Next
+                </button>
             )}
 
             <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-slate-400 !top-1/2 !-translate-y-1/2" />

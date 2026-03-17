@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { ChevronRight, Home, Undo2, Redo2, Trash2, BoxSelect, Link, Menu, LayoutGrid, List, MoreVertical, Eye, Zap } from 'lucide-react';
+import { ChevronRight, Home, Undo2, Redo2, Trash2, BoxSelect, Link, Menu, LayoutGrid, List, MoreVertical, Eye, Zap, Maximize2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useStore } from 'zustand';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 import { SaveIndicator } from '../UI/SaveIndicator';
 
 export const TopBar: React.FC = () => {
-    const { isTouchDevice } = useDeviceDetect();
+    const { isTouchDevice, screenSize } = useDeviceDetect();
+    const isSmallScreen = screenSize === 'small';
     const navStack = useWorkspaceStore(state => state.navStack);
     const navigateToBreadcrumb = useWorkspaceStore(state => state.navigateToBreadcrumb);
     const executionMode = useWorkspaceStore(state => state.executionMode);
@@ -79,7 +80,8 @@ export const TopBar: React.FC = () => {
 
             <div className="flex items-center gap-1 touch:gap-0">
                 <SaveIndicator />
-                {/* View mode toggle: Graph / List */}
+                {/* View mode toggle: Graph / List — hidden on small screens (moved to overflow) */}
+                {!isSmallScreen && (
                 <div className="flex items-center bg-gray-800 rounded-lg p-0.5 mr-1">
                     <button
                         onClick={() => setViewMode('graph')}
@@ -106,6 +108,7 @@ export const TopBar: React.FC = () => {
                         <List className="w-4 h-4" />
                     </button>
                 </div>
+                )}
 
                 {/* Desktop: show all buttons inline */}
                 {!isTouchDevice && (
@@ -141,7 +144,7 @@ export const TopBar: React.FC = () => {
                     title={executionMode ? "Currently in Execution Mode — click to switch to Planning" : "Currently in Plan Mode — click to switch to Execution"}
                 >
                     {executionMode ? <Zap className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    <span className="hidden sm:inline text-sm">{executionMode ? "Executing" : "Planning"}</span>
+                    {!isSmallScreen && <span className="hidden sm:inline text-sm">{executionMode ? "Executing" : "Planning"}</span>}
                 </button>
 
                 {/* Mobile: overflow menu for secondary actions */}
@@ -159,6 +162,44 @@ export const TopBar: React.FC = () => {
                         </button>
                         {overflowOpen && (
                             <div className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 py-1 min-w-[180px]">
+                                {/* View mode toggle — shown here on small screens */}
+                                {isSmallScreen && (
+                                    <>
+                                        <button
+                                            onClick={() => { setViewMode('graph'); setOverflowOpen(false); }}
+                                            className={clsx(
+                                                "flex items-center gap-3 w-full px-4 py-3 text-sm text-left hover:bg-gray-700 transition-colors",
+                                                viewMode === 'graph' ? "text-white" : "text-gray-300"
+                                            )}
+                                        >
+                                            <LayoutGrid className="w-4 h-4 flex-shrink-0" />
+                                            Node View
+                                            {viewMode === 'graph' && <span className="ml-auto text-purple-400 text-xs">Active</span>}
+                                        </button>
+                                        <button
+                                            onClick={() => { setViewMode('list'); setOverflowOpen(false); }}
+                                            className={clsx(
+                                                "flex items-center gap-3 w-full px-4 py-3 text-sm text-left hover:bg-gray-700 transition-colors",
+                                                viewMode === 'list' ? "text-white" : "text-gray-300"
+                                            )}
+                                        >
+                                            <List className="w-4 h-4 flex-shrink-0" />
+                                            List View
+                                            {viewMode === 'list' && <span className="ml-auto text-purple-400 text-xs">Active</span>}
+                                        </button>
+                                        <div className="border-t border-gray-700 my-1" />
+                                    </>
+                                )}
+                                <button
+                                    onClick={() => { document.dispatchEvent(new CustomEvent('canvas:fit-view')); setOverflowOpen(false); }}
+                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left text-gray-300 hover:bg-gray-700 transition-colors"
+                                >
+                                    <Maximize2 className="w-4 h-4 flex-shrink-0" />
+                                    View Full Flow
+                                </button>
+
+                                <div className="border-t border-gray-700 my-1" />
+
                                 <button
                                     onClick={() => { undo(); setOverflowOpen(false); }}
                                     disabled={pastStates.length === 0}
