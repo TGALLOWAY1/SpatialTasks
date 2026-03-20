@@ -5,14 +5,15 @@ import { useToastStore } from '../UI/Toast';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { supabase } from '../../lib/supabase';
 import { clsx } from 'clsx';
-import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus, Sparkles } from 'lucide-react';
+import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus, Sparkles, FileUp } from 'lucide-react';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
 interface SidebarProps {
     onGenerateFlow?: () => void;
+    onImportPlan?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan }) => {
     const { isMobile } = useDeviceDetect();
     const sidebarOpen = useWorkspaceStore(state => state.sidebarOpen);
     const closeSidebar = useWorkspaceStore(state => state.closeSidebar);
@@ -238,10 +239,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow }) => {
                         {onGenerateFlow && (
                             <button
                                 onClick={() => { onGenerateFlow(); if (isMobile) closeSidebar(); }}
-                                className="w-full flex items-center gap-2 px-3 py-2.5 mb-3 rounded-lg text-sm font-medium bg-purple-600/20 border border-purple-700/50 text-purple-300 hover:bg-purple-600/30 hover:text-purple-200 transition-colors"
+                                className="w-full flex items-center gap-2 px-3 py-2.5 mb-2 rounded-lg text-sm font-medium bg-purple-600/20 border border-purple-700/50 text-purple-300 hover:bg-purple-600/30 hover:text-purple-200 transition-colors"
                             >
                                 <Sparkles className="w-4 h-4" />
                                 Generate Flow
+                            </button>
+                        )}
+                        {/* Import Plan CTA */}
+                        {onImportPlan && (
+                            <button
+                                onClick={() => { onImportPlan(); if (isMobile) closeSidebar(); }}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 mb-3 rounded-lg text-sm font-medium bg-emerald-600/20 border border-emerald-700/50 text-emerald-300 hover:bg-emerald-600/30 hover:text-emerald-200 transition-colors"
+                            >
+                                <FileUp className="w-4 h-4" />
+                                Import Plan
                             </button>
                         )}
                         <div className="flex items-center justify-between mb-2 px-2">

@@ -4,6 +4,7 @@ export type NodeType = 'action' | 'container';
 export interface NodeMeta {
     notes?: string;
     tags?: string[];
+    verification?: string;
     [key: string]: any;
 }
 

@@ -23,7 +23,13 @@ export function useWorkspaceSync() {
 
     // 1. On auth, load workspace from Supabase
     useEffect(() => {
-        if (!user) return;
+        if (!user) {
+            // If SKIP_AUTH is active, mark as loaded so the app renders
+            if (import.meta.env.VITE_SKIP_AUTH === 'true') {
+                setSupabaseLoaded(true);
+            }
+            return;
+        }
         // Avoid re-loading if already loaded for this user
         if (loadedForUser.current === user.id) return;
 
