@@ -19,6 +19,22 @@ A spatial, node-based task management system. Organize projects as connected nod
 - **Undo / Redo** — Full undo/redo history (Ctrl+Z / Ctrl+Shift+Z)
 - **Persistent State** — All work is saved locally in the browser with a live save indicator
 
+### Markdown Plan Import
+
+- **Import Implementation Plans** — Upload a `.md` / `.txt` file or paste markdown to auto-generate a project graph from your plan
+- **Smart Parsing** — `## Headings` become steps (container nodes), bullet lists become substeps (action nodes), and `### Verification` sections are preserved
+- **Description & Notes** — Step descriptions from the markdown are stored in each node's notes for reference during execution
+- **Review Before Creating** — Parsed plans open in the interactive draft review panel where you can rename, reorder, indent/outdent, and add/remove steps before committing to canvas
+- **File Drop Zone** — Drag-and-drop file upload with paste-markdown fallback tab
+
+### Enhanced Execution Mode
+
+- **Step Detail Panel** — When executing inside a step's subgraph, a floating panel shows the step description, substep checklist, and verification criteria
+- **Inline Substep Checklist** — Click any substep in the panel to cycle its status (todo → in progress → done) without leaving the panel
+- **Verification Criteria** — Collapsible verification section (parsed from `### Verification` in the imported markdown) displayed in an amber-accented box
+- **Complete & Move On** — One-click button to mark all remaining substeps as done, navigate back to the parent graph, and auto-advance to the next step
+- **Collapsible Panel** — Panel can be collapsed to a slim tab on the right edge; responsive bottom-sheet layout on mobile
+
 ### AI Features
 
 - **Magic Expand** — Use your own Gemini API key to auto-decompose container nodes into subtask subflows with dependencies
