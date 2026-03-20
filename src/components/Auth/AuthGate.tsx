@@ -5,6 +5,8 @@ import { AuthScreen } from './AuthScreen';
 import { ResetPasswordScreen } from './ResetPasswordScreen';
 import { LoadingScreen } from '../UI/LoadingScreen';
 
+const SKIP_AUTH = import.meta.env.VITE_SKIP_AUTH === 'true';
+
 export const AuthGate: React.FC<{ children: React.ReactNode }> = ({
     children,
 }) => {
@@ -15,6 +17,11 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({
     const [isRecovery, setIsRecovery] = useState(false);
 
     useEffect(() => {
+        if (SKIP_AUTH) {
+            setLoading(false);
+            return;
+        }
+
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setLoading(false);
@@ -31,6 +38,10 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({
 
         return () => subscription.unsubscribe();
     }, [setSession, setLoading]);
+
+    if (SKIP_AUTH) {
+        return <>{children}</>;
+    }
 
     if (loading) {
         return <LoadingScreen message="Checking session..." />;
