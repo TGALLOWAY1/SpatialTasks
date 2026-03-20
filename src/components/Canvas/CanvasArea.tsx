@@ -22,6 +22,7 @@ import { FloatingActionButton } from '../UI/FloatingActionButton';
 import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Sparkles, Maximize2 } from 'lucide-react';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 import { isNodeActionable } from '../../utils/logic';
+import { StepDetailPanel } from '../ExecutionPanel/StepDetailPanel';
 
 const nodeTypes = {
     container: ContainerNode,
@@ -821,6 +822,9 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                     onCancel={() => setConfirmAction(null)}
                 />
             )}
+
+            {/* Execution mode step detail panel */}
+            <StepDetailPanel />
         </div>
     );
 };
