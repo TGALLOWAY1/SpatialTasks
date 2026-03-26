@@ -100,6 +100,9 @@ export const StepDetailPanel: React.FC = () => {
         const graph = graphs[activeGraphId];
         if (!graph) return;
 
+        // Capture container node ID before navigating back (avoids stale closure)
+        const containerNodeId = navStack[navStack.length - 1]?.nodeId;
+
         // Mark all non-done substeps as done
         const notDoneIds = graph.nodes
             .filter(n => n.type === 'action' && n.status !== 'done')
@@ -114,7 +117,6 @@ export const StepDetailPanel: React.FC = () => {
 
         // Dispatch advance event after a short delay to let state propagate
         setTimeout(() => {
-            const containerNodeId = navStack[navStack.length - 1]?.nodeId;
             document.dispatchEvent(
                 new CustomEvent('canvas:advance-next', {
                     detail: { fromNodeId: containerNodeId },

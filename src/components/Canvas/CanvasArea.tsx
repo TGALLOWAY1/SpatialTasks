@@ -48,6 +48,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     const addEdge = useWorkspaceStore(state => state.addEdge);
     const addNode = useWorkspaceStore(state => state.addNode);
     const batchUpdateNodes = useWorkspaceStore(state => state.batchUpdateNodes);
+    const batchUpdatePositions = useWorkspaceStore(state => state.batchUpdatePositions);
     const selectMode = useWorkspaceStore(state => state.selectMode);
     const setHasSelection = useWorkspaceStore(state => state.setHasSelection);
     const connectMode = useWorkspaceStore(state => state.connectMode);
@@ -113,11 +114,15 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
 
     const onNodesChange = useCallback((changes: NodeChange[]) => {
         const applyChanges = () => {
+            const posUpdates: Array<{ id: string; x: number; y: number }> = [];
             changes.forEach(change => {
                 if (change.type === 'position' && change.position) {
-                    updateNode(change.id, { x: change.position.x, y: change.position.y });
+                    posUpdates.push({ id: change.id, x: change.position.x, y: change.position.y });
                 }
             });
+            if (posUpdates.length > 0) {
+                batchUpdatePositions(posUpdates);
+            }
         };
 
         if (isTouchDevice) {
@@ -126,7 +131,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         } else {
             applyChanges();
         }
-    }, [updateNode, isTouchDevice]);
+    }, [batchUpdatePositions, isTouchDevice]);
 
     // Drag-to-connect edges
     const onConnect = useCallback((connection: Connection) => {
@@ -234,7 +239,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
 
             // Small delay to let the status update propagate
             setTimeout(() => {
-                const currentGraph = graphs[activeGraphId];
+                const currentGraph = useWorkspaceStore.getState().graphs[activeGraphId];
                 if (!currentGraph) return;
 
                 // Find the next actionable node
@@ -461,111 +466,25 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         };
     }, [isTouchDevice, navStack.length, navigateBack]);
 
-    // Build action sheet items (reuses same logic as context menu)
-    const buildActionSheetItems = useCallback((): MenuItem[] => {
-        if (!actionSheet || !activeGraphId) return [];
+    // Shared menu builder for both context menu and action sheet
+    const buildMenuItems = useCallback((target: {
+        nodeId?: string; edgeId?: string; flowX?: number; flowY?: number;
+    }, opts?: { multiSelect?: boolean }): MenuItem[] => {
+        if (!activeGraphId) return [];
 
-        if (actionSheet.edgeId) {
+        if (target.edgeId) {
             return [{
                 label: 'Remove Dependency',
                 icon: <Trash2 className="w-4 h-4" />,
                 danger: true,
-                onClick: () => removeEdge(actionSheet.edgeId!),
+                onClick: () => removeEdge(target.edgeId!),
             }];
         }
 
-        if (actionSheet.nodeId) {
-            const node = graph?.nodes.find(n => n.id === actionSheet.nodeId);
-            const items: MenuItem[] = [];
-
-            if (node?.type === 'action') {
-                items.push({
-                    label: 'Set Status',
-                    submenu: [
-                        { label: 'Todo', icon: <Circle className="w-4 h-4" />, onClick: () => updateNode(actionSheet.nodeId!, { status: 'todo' }) },
-                        { label: 'In Progress', icon: <Clock className="w-4 h-4" />, onClick: () => updateNode(actionSheet.nodeId!, { status: 'in_progress' }) },
-                        { label: 'Done', icon: <CheckCircle2 className="w-4 h-4" />, onClick: () => updateNode(actionSheet.nodeId!, { status: 'done' }) },
-                    ],
-                    onClick: () => {},
-                });
-            }
-
-            items.push({
-                label: 'Delete',
-                icon: <Trash2 className="w-4 h-4" />,
-                danger: true,
-                onClick: () => {
-                    if (node?.type === 'container') {
-                        const nodeId = actionSheet.nodeId!;
-                        setConfirmAction({
-                            title: 'Delete Container',
-                            message: 'Delete this container and all its children?',
-                            onConfirm: () => removeNode(nodeId),
-                        });
-                        return;
-                    }
-                    removeNode(actionSheet.nodeId!);
-                },
-            });
-            return items;
-        }
-
-        // Pane action sheet
-        return [
-            {
-                label: 'New Action Node',
-                icon: <Plus className="w-4 h-4" />,
-                onClick: () => {
-                    addNode({
-                        id: uuidv4(),
-                        graphId: activeGraphId,
-                        type: 'action',
-                        title: 'New Task',
-                        x: actionSheet.flowX ?? 0,
-                        y: actionSheet.flowY ?? 0,
-                        width: 200,
-                        height: 50,
-                        status: 'todo',
-                    });
-                },
-            },
-            {
-                label: 'New Container',
-                icon: <Layers className="w-4 h-4" />,
-                onClick: () => {
-                    addNode({
-                        id: uuidv4(),
-                        graphId: activeGraphId,
-                        type: 'container',
-                        title: 'New Group',
-                        x: actionSheet.flowX ?? 0,
-                        y: actionSheet.flowY ?? 0,
-                        width: 200,
-                        height: 80,
-                    });
-                },
-            },
-        ];
-    }, [actionSheet, activeGraphId, graph, removeEdge, removeNode, updateNode, addNode]);
-
-    const buildContextMenuItems = useCallback((): MenuItem[] => {
-        if (!contextMenu || !activeGraphId) return [];
-
-        if (contextMenu.edgeId) {
-            return [{
-                label: 'Remove Dependency',
-                icon: <Trash2 className="w-4 h-4" />,
-                danger: true,
-                onClick: () => removeEdge(contextMenu.edgeId!),
-            }];
-        }
-
-        if (contextMenu.nodeId) {
-            const selectedNodes = reactFlowInstance.getNodes().filter(n => n.selected);
-            const isMulti = selectedNodes.length > 1 && selectedNodes.some(n => n.id === contextMenu.nodeId);
-            const node = graph?.nodes.find(n => n.id === contextMenu.nodeId);
-
-            if (isMulti) {
+        if (target.nodeId) {
+            // Multi-select handling (desktop context menu only)
+            if (opts?.multiSelect) {
+                const selectedNodes = reactFlowInstance.getNodes().filter(n => n.selected);
                 const nodeIds = selectedNodes.map(n => n.id);
                 return [
                     {
@@ -592,14 +511,16 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 ];
             }
 
+            const node = graph?.nodes.find(n => n.id === target.nodeId);
             const items: MenuItem[] = [];
+
             if (node?.type === 'action') {
                 items.push({
                     label: 'Set Status',
                     submenu: [
-                        { label: 'Todo', icon: <Circle className="w-4 h-4" />, onClick: () => updateNode(contextMenu.nodeId!, { status: 'todo' }) },
-                        { label: 'In Progress', icon: <Clock className="w-4 h-4" />, onClick: () => updateNode(contextMenu.nodeId!, { status: 'in_progress' }) },
-                        { label: 'Done', icon: <CheckCircle2 className="w-4 h-4" />, onClick: () => updateNode(contextMenu.nodeId!, { status: 'done' }) },
+                        { label: 'Todo', icon: <Circle className="w-4 h-4" />, onClick: () => updateNode(target.nodeId!, { status: 'todo' }) },
+                        { label: 'In Progress', icon: <Clock className="w-4 h-4" />, onClick: () => updateNode(target.nodeId!, { status: 'in_progress' }) },
+                        { label: 'Done', icon: <CheckCircle2 className="w-4 h-4" />, onClick: () => updateNode(target.nodeId!, { status: 'done' }) },
                     ],
                     onClick: () => {},
                 });
@@ -608,10 +529,9 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 label: 'Delete',
                 icon: <Trash2 className="w-4 h-4" />,
                 danger: true,
-                shortcut: 'Del',
                 onClick: () => {
                     if (node?.type === 'container') {
-                        const nodeId = contextMenu.nodeId!;
+                        const nodeId = target.nodeId!;
                         setConfirmAction({
                             title: 'Delete Container',
                             message: 'Delete this container and all its children?',
@@ -619,13 +539,13 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                         });
                         return;
                     }
-                    removeNode(contextMenu.nodeId!);
+                    removeNode(target.nodeId!);
                 },
             });
             return items;
         }
 
-        // Pane context menu
+        // Pane menu
         return [
             {
                 label: 'New Action Node',
@@ -636,8 +556,8 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                         graphId: activeGraphId,
                         type: 'action',
                         title: 'New Task',
-                        x: contextMenu.flowX ?? 0,
-                        y: contextMenu.flowY ?? 0,
+                        x: target.flowX ?? 0,
+                        y: target.flowY ?? 0,
                         width: 200,
                         height: 50,
                         status: 'todo',
@@ -653,15 +573,27 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                         graphId: activeGraphId,
                         type: 'container',
                         title: 'New Group',
-                        x: contextMenu.flowX ?? 0,
-                        y: contextMenu.flowY ?? 0,
+                        x: target.flowX ?? 0,
+                        y: target.flowY ?? 0,
                         width: 200,
                         height: 80,
                     });
                 },
             },
         ];
-    }, [contextMenu, activeGraphId, graph, reactFlowInstance, removeEdge, removeNode, removeNodes, updateNode, batchUpdateNodes, addNode]);
+    }, [activeGraphId, graph, reactFlowInstance, removeEdge, removeNode, removeNodes, updateNode, batchUpdateNodes, addNode]);
+
+    const buildActionSheetItems = useCallback((): MenuItem[] => {
+        if (!actionSheet) return [];
+        return buildMenuItems(actionSheet);
+    }, [actionSheet, buildMenuItems]);
+
+    const buildContextMenuItems = useCallback((): MenuItem[] => {
+        if (!contextMenu) return [];
+        const selectedNodes = reactFlowInstance.getNodes().filter(n => n.selected);
+        const isMulti = !!(contextMenu.nodeId && selectedNodes.length > 1 && selectedNodes.some(n => n.id === contextMenu.nodeId));
+        return buildMenuItems(contextMenu, { multiSelect: isMulti });
+    }, [contextMenu, reactFlowInstance, buildMenuItems]);
 
     // FAB quick-add: place node at center of viewport
     const handleFabAdd = useCallback((title: string) => {

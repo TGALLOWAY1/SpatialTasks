@@ -87,6 +87,7 @@ export function debouncedSave(
             _pendingSave = false;
         } catch (err) {
             console.error('Failed to save workspace to Supabase:', err);
+            _pendingSave = false;
             // Data is safe in localStorage — will retry on next state change
         }
     }, delayMs);

@@ -69,8 +69,9 @@ function topoSortWithDepth(graph: Graph): { node: Node; depth: number }[] {
     }
 
     // Include any nodes not in the sorted result (disconnected/cycle)
+    const sortedSet = new Set(sorted);
     for (const n of graph.nodes) {
-        if (!sorted.includes(n.id)) {
+        if (!sortedSet.has(n.id)) {
             sorted.push(n.id);
             depthMap.set(n.id, 0);
         }
