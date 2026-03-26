@@ -45,6 +45,7 @@ interface WorkspaceState extends Workspace {
     cycleNodeStatus: (nodeId: string) => void;
     batchUpdateNodes: (nodeIds: string[], data: Partial<Node>) => void;
     addGraph: (graph: Graph) => void;
+    removeGraphTree: (graphId: string) => void;
     addEdge: (edge: Edge) => void;
     updateSettings: (settings: Partial<WorkspaceSettings>) => void;
     onNodesChange: (changes: any[]) => void; // ReactFlow hook
@@ -392,6 +393,24 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 set({
                     graphs: { ...graphs, [graph.id]: graph }
                 });
+            },
+
+            removeGraphTree: (graphId) => {
+                const { graphs } = get();
+                const idsToDelete: string[] = [];
+                const collect = (gid: string) => {
+                    const g = graphs[gid];
+                    if (!g) return;
+                    idsToDelete.push(gid);
+                    g.nodes.forEach(n => {
+                        if (n.childGraphId) collect(n.childGraphId);
+                    });
+                };
+                collect(graphId);
+                if (idsToDelete.length === 0) return;
+                const updatedGraphs = { ...graphs };
+                idsToDelete.forEach(id => delete updatedGraphs[id]);
+                set({ graphs: updatedGraphs });
             },
 
             addEdge: (edge) => {

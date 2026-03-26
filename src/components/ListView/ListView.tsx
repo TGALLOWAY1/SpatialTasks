@@ -188,6 +188,7 @@ const ContainerItem: React.FC<{
     const graphs = useWorkspaceStore(state => state.graphs);
     const settings = useWorkspaceStore(state => state.settings);
     const addGraph = useWorkspaceStore(state => state.addGraph);
+    const removeGraphTree = useWorkspaceStore(state => state.removeGraphTree);
     const updateNode = useWorkspaceStore(state => state.updateNode);
     const updateSettings = useWorkspaceStore(state => state.updateSettings);
     const addToast = useToastStore(state => state.addToast);
@@ -230,6 +231,12 @@ const ContainerItem: React.FC<{
         setExpanding(true);
         try {
             const result = await magicExpand(settings.geminiApiKey!, node.title, node.meta?.notes);
+
+            // Clean up old child graph tree to prevent orphans
+            if (node.childGraphId) {
+                removeGraphTree(node.childGraphId);
+            }
+
             const currentGraph = activeGraphId ? graphs[activeGraphId] : null;
             const projectId = currentGraph?.projectId || '';
             const childGraphId = uuidv4();
