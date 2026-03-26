@@ -181,7 +181,12 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         doDelete();
     }, [reactFlowInstance, removeEdge, removeNodes, setHasSelection]);
 
-    // Keyboard shortcuts: delete, undo, redo
+    // Fit view handler (used by keyboard shortcut and toolbar)
+    const handleFitView = useCallback(() => {
+        reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+    }, [reactFlowInstance]);
+
+    // Keyboard shortcuts: delete, undo, redo, fit-view
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const target = e.target as HTMLElement;
@@ -203,6 +208,14 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 return;
             }
 
+            // Fit view: Ctrl/Cmd+Shift+F
+            if (e.key === 'f' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+                if (isTyping) return;
+                e.preventDefault();
+                handleFitView();
+                return;
+            }
+
             // Delete: Backspace or Delete
             if (e.key !== 'Backspace' && e.key !== 'Delete') return;
             if (isTyping) return;
@@ -212,7 +225,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [deleteSelected]);
+    }, [deleteSelected, handleFitView]);
 
     // Listen for toolbar delete event (from TopBar delete button)
     useEffect(() => {
@@ -222,10 +235,6 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     }, [deleteSelected]);
 
     // Listen for fit-view event (from TopBar overflow menu)
-    const handleFitView = useCallback(() => {
-        reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
-    }, [reactFlowInstance]);
-
     useEffect(() => {
         document.addEventListener('canvas:fit-view', handleFitView);
         return () => document.removeEventListener('canvas:fit-view', handleFitView);
@@ -286,8 +295,8 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         setQuickAdd({
             x: flowPosition.x,
             y: flowPosition.y,
-            screenX: event.clientX,
-            screenY: event.clientY,
+            screenX: Math.min(event.clientX, window.innerWidth - 210),
+            screenY: Math.min(event.clientY, window.innerHeight - 50),
         });
     }, [reactFlowInstance]);
 

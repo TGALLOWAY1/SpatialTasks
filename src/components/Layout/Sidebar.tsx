@@ -22,6 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan }
     const loadProject = useWorkspaceStore(state => state.loadProject);
     const createProject = useWorkspaceStore(state => state.createProject);
     const deleteProject = useWorkspaceStore(state => state.deleteProject);
+    const renameProject = useWorkspaceStore(state => state.renameProject);
     const resetWorkspace = useWorkspaceStore(state => state.resetWorkspace);
     const settings = useWorkspaceStore(state => state.settings);
     const updateSettings = useWorkspaceStore(state => state.updateSettings);
@@ -37,6 +38,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan }
     const [newProjectTitle, setNewProjectTitle] = useState('');
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+    const [editingProjectTitle, setEditingProjectTitle] = useState('');
 
     const geminiStatus = settings.geminiStatus || (settings.geminiApiKey ? 'configured' : 'no_key');
 
@@ -299,18 +302,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan }
                             )}
                             {projects.map(project => (
                                 <div key={project.id} className="group relative flex items-center">
-                                    <button
-                                        onClick={() => { loadProject(project.id); if (isMobile) closeSidebar(); }}
-                                        className={clsx(
-                                            "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                                            activeProjectId === project.id
-                                                ? "bg-purple-900/30 text-purple-300 border border-purple-800"
-                                                : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
-                                        )}
-                                    >
-                                        {project.title}
-                                    </button>
-                                    {projects.length > 1 && (
+                                    {editingProjectId === project.id ? (
+                                        <input
+                                            autoFocus
+                                            value={editingProjectTitle}
+                                            onChange={(e) => setEditingProjectTitle(e.target.value)}
+                                            onBlur={() => {
+                                                const trimmed = editingProjectTitle.trim();
+                                                if (trimmed && trimmed !== project.title) {
+                                                    renameProject(project.id, trimmed);
+                                                }
+                                                setEditingProjectId(null);
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                                if (e.key === 'Escape') setEditingProjectId(null);
+                                            }}
+                                            className="w-full px-3 py-2 rounded-md text-sm bg-gray-800 border border-purple-600 text-white placeholder-gray-500 focus:outline-none"
+                                        />
+                                    ) : (
+                                        <button
+                                            onClick={() => { loadProject(project.id); if (isMobile) closeSidebar(); }}
+                                            onDoubleClick={() => { setEditingProjectId(project.id); setEditingProjectTitle(project.title); }}
+                                            className={clsx(
+                                                "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
+                                                activeProjectId === project.id
+                                                    ? "bg-purple-900/30 text-purple-300 border border-purple-800"
+                                                    : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                                            )}
+                                        >
+                                            {project.title}
+                                        </button>
+                                    )}
+                                    {projects.length > 1 && editingProjectId !== project.id && (
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(project.id); }}
                                             className="absolute right-1 p-1 rounded text-gray-600 opacity-0 group-hover:opacity-100 touch:opacity-70 hover:text-red-400 hover:bg-gray-800 transition-all touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"

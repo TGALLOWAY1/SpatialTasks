@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
+import { ConfirmModal } from '../UI/ConfirmModal';
 import { isNodeBlocked } from '../../utils/logic';
 import { clsx } from 'clsx';
 import {
@@ -44,6 +45,7 @@ export const StepDetailPanel: React.FC = () => {
     const [collapsed, setCollapsed] = useState(false);
     const [showDescription, setShowDescription] = useState(true);
     const [showVerification, setShowVerification] = useState(true);
+    const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
 
     // Get parent container node info
     const parentInfo = useMemo(() => {
@@ -282,7 +284,13 @@ export const StepDetailPanel: React.FC = () => {
             {/* Footer: Complete & Move On */}
             <div className="p-3 border-t border-gray-800 shrink-0">
                 <button
-                    onClick={handleCompleteAndMoveOn}
+                    onClick={() => {
+                        if (progress < 1 && totalCount - doneCount > 0) {
+                            setShowCompleteConfirm(true);
+                        } else {
+                            handleCompleteAndMoveOn();
+                        }
+                    }}
                     className={clsx(
                         'w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors',
                         progress >= 1
@@ -308,6 +316,16 @@ export const StepDetailPanel: React.FC = () => {
                     </p>
                 )}
             </div>
+
+            {showCompleteConfirm && (
+                <ConfirmModal
+                    title="Complete Step"
+                    message={`Mark ${totalCount - doneCount} remaining task${totalCount - doneCount !== 1 ? 's' : ''} as done and move on?`}
+                    confirmLabel="Complete All"
+                    onConfirm={() => { setShowCompleteConfirm(false); handleCompleteAndMoveOn(); }}
+                    onCancel={() => setShowCompleteConfirm(false)}
+                />
+            )}
         </div>
     );
 };

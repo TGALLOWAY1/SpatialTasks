@@ -34,6 +34,7 @@ interface WorkspaceState extends Workspace {
 
     // Project management
     createProject: (title: string) => void;
+    renameProject: (projectId: string, title: string) => void;
     deleteProject: (projectId: string) => void;
 
     // Graph edits
@@ -197,6 +198,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     activeGraphId: rootGraphId,
                     navStack: [{ graphId: rootGraphId, label: title }],
                     executionMode: false,
+                });
+            },
+
+            renameProject: (projectId, title) => {
+                const { projects } = get();
+                set({
+                    projects: projects.map(p =>
+                        p.id === projectId ? { ...p, title, updatedAt: new Date().toISOString() } : p
+                    ),
                 });
             },
 
