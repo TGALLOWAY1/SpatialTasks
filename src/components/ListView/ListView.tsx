@@ -4,7 +4,7 @@ import { Node, Graph } from '../../types';
 import { isNodeBlocked, getContainerProgress } from '../../utils/logic';
 import {
     CheckCircle2, Circle, Clock, Lock, Layers, ArrowRightCircle,
-    Pencil, Sparkles, Loader2, ChevronRight, ChevronDown, GitBranch,
+    Pencil, Sparkles, Loader2, ChevronRight, ChevronDown, GitBranch, Trash2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
@@ -69,8 +69,9 @@ function topoSortWithDepth(graph: Graph): { node: Node; depth: number }[] {
     }
 
     // Include any nodes not in the sorted result (disconnected/cycle)
+    const sortedSet = new Set(sorted);
     for (const n of graph.nodes) {
-        if (!sorted.includes(n.id)) {
+        if (!sortedSet.has(n.id)) {
             sorted.push(n.id);
             depthMap.set(n.id, 0);
         }
@@ -96,6 +97,7 @@ function getParallelCounts(items: { node: Node; depth: number }[]): Map<number, 
 const ActionItem: React.FC<{ node: Node; blocked: boolean; depth: number; isParallel: boolean }> = ({ node, blocked, depth, isParallel }) => {
     const cycleNodeStatus = useWorkspaceStore(state => state.cycleNodeStatus);
     const updateNode = useWorkspaceStore(state => state.updateNode);
+    const removeNode = useWorkspaceStore(state => state.removeNode);
     const [editing, setEditing] = useState(false);
     const [editValue, setEditValue] = useState(node.title);
 
@@ -167,11 +169,18 @@ const ActionItem: React.FC<{ node: Node; blocked: boolean; depth: number; isPara
             {!editing && (
                 <button
                     onClick={() => { setEditing(true); setEditValue(node.title); }}
-                    className="text-slate-500 hover:text-slate-300 transition-colors flex-shrink-0"
+                    className="text-slate-500 hover:text-slate-300 transition-colors flex-shrink-0 touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
                 >
                     <Pencil className="w-3.5 h-3.5" />
                 </button>
             )}
+            <button
+                onClick={() => removeNode(node.id)}
+                className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0 touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
+                title="Delete task"
+            >
+                <Trash2 className="w-3.5 h-3.5" />
+            </button>
         </div>
     );
 };
@@ -188,6 +197,8 @@ const ContainerItem: React.FC<{
     const graphs = useWorkspaceStore(state => state.graphs);
     const settings = useWorkspaceStore(state => state.settings);
     const addGraph = useWorkspaceStore(state => state.addGraph);
+    const removeGraphTree = useWorkspaceStore(state => state.removeGraphTree);
+    const removeNode = useWorkspaceStore(state => state.removeNode);
     const updateNode = useWorkspaceStore(state => state.updateNode);
     const updateSettings = useWorkspaceStore(state => state.updateSettings);
     const addToast = useToastStore(state => state.addToast);
@@ -196,6 +207,7 @@ const ContainerItem: React.FC<{
     const [editing, setEditing] = useState(false);
     const [editValue, setEditValue] = useState(node.title);
     const [showExpandConfirm, setShowExpandConfirm] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const progress = useMemo(() => getContainerProgress(node, { graphs } as any), [node, graphs]);
     const hasApiKey = !!settings.geminiApiKey;
@@ -230,6 +242,12 @@ const ContainerItem: React.FC<{
         setExpanding(true);
         try {
             const result = await magicExpand(settings.geminiApiKey!, node.title, node.meta?.notes);
+
+            // Clean up old child graph tree to prevent orphans
+            if (node.childGraphId) {
+                removeGraphTree(node.childGraphId);
+            }
+
             const currentGraph = activeGraphId ? graphs[activeGraphId] : null;
             const projectId = currentGraph?.projectId || '';
             const childGraphId = uuidv4();
@@ -334,7 +352,7 @@ const ContainerItem: React.FC<{
                     {!editing && (
                         <button
                             onClick={() => { setEditing(true); setEditValue(node.title); }}
-                            className="text-indigo-400 hover:text-indigo-200 transition-colors p-1"
+                            className="text-indigo-400 hover:text-indigo-200 transition-colors p-1 touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
                         >
                             <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -356,6 +374,13 @@ const ContainerItem: React.FC<{
                     >
                         <ArrowRightCircle className="w-5 h-5" />
                     </button>
+                    <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="text-slate-600 hover:text-red-400 transition-colors p-1 touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
+                        title="Delete container"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                 </div>
             </div>
             {showExpandConfirm && (
@@ -366,6 +391,16 @@ const ContainerItem: React.FC<{
                     danger
                     onConfirm={() => { setShowExpandConfirm(false); doMagicExpand(); }}
                     onCancel={() => setShowExpandConfirm(false)}
+                />
+            )}
+            {showDeleteConfirm && (
+                <ConfirmModal
+                    title="Delete Container"
+                    message={`Delete "${node.title}" and all its children? This cannot be undone.`}
+                    confirmLabel="Delete"
+                    danger
+                    onConfirm={() => { setShowDeleteConfirm(false); removeNode(node.id); }}
+                    onCancel={() => setShowDeleteConfirm(false)}
                 />
             )}
         </>

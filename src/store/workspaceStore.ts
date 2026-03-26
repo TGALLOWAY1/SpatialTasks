@@ -34,6 +34,7 @@ interface WorkspaceState extends Workspace {
 
     // Project management
     createProject: (title: string) => void;
+    renameProject: (projectId: string, title: string) => void;
     deleteProject: (projectId: string) => void;
 
     // Graph edits
@@ -44,7 +45,9 @@ interface WorkspaceState extends Workspace {
     removeNodes: (nodeIds: string[]) => void;
     cycleNodeStatus: (nodeId: string) => void;
     batchUpdateNodes: (nodeIds: string[], data: Partial<Node>) => void;
+    batchUpdatePositions: (updates: Array<{ id: string; x: number; y: number }>) => void;
     addGraph: (graph: Graph) => void;
+    removeGraphTree: (graphId: string) => void;
     addEdge: (edge: Edge) => void;
     updateSettings: (settings: Partial<WorkspaceSettings>) => void;
     onNodesChange: (changes: any[]) => void; // ReactFlow hook
@@ -195,6 +198,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     activeGraphId: rootGraphId,
                     navStack: [{ graphId: rootGraphId, label: title }],
                     executionMode: false,
+                });
+            },
+
+            renameProject: (projectId, title) => {
+                const { projects } = get();
+                set({
+                    projects: projects.map(p =>
+                        p.id === projectId ? { ...p, title, updatedAt: new Date().toISOString() } : p
+                    ),
                 });
             },
 
@@ -387,11 +399,44 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 });
             },
 
+            batchUpdatePositions: (updates) => {
+                const { activeGraphId, graphs } = get();
+                if (!activeGraphId || updates.length === 0) return;
+
+                const graph = graphs[activeGraphId];
+                const posMap = new Map(updates.map(u => [u.id, u]));
+                const updatedNodes = graph.nodes.map(n => {
+                    const pos = posMap.get(n.id);
+                    return pos ? { ...n, x: pos.x, y: pos.y } : n;
+                });
+                set({
+                    graphs: { ...graphs, [activeGraphId]: { ...graph, nodes: updatedNodes } }
+                });
+            },
+
             addGraph: (graph) => {
                 const { graphs } = get();
                 set({
                     graphs: { ...graphs, [graph.id]: graph }
                 });
+            },
+
+            removeGraphTree: (graphId) => {
+                const { graphs } = get();
+                const idsToDelete: string[] = [];
+                const collect = (gid: string) => {
+                    const g = graphs[gid];
+                    if (!g) return;
+                    idsToDelete.push(gid);
+                    g.nodes.forEach(n => {
+                        if (n.childGraphId) collect(n.childGraphId);
+                    });
+                };
+                collect(graphId);
+                if (idsToDelete.length === 0) return;
+                const updatedGraphs = { ...graphs };
+                idsToDelete.forEach(id => delete updatedGraphs[id]);
+                set({ graphs: updatedGraphs });
             },
 
             addEdge: (edge) => {
@@ -443,6 +488,30 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     if (!Array.isArray(data.projects)) throw new Error('Missing projects');
                     if (typeof data.graphs !== 'object') throw new Error('Missing graphs');
                     if (typeof data.version !== 'number') throw new Error('Missing version');
+
+                    // Validate project shape
+                    for (const p of data.projects) {
+                        if (!p.id || !p.title || !p.rootGraphId) throw new Error('Invalid project');
+                    }
+
+                    // Validate graph/node/edge shape
+                    for (const [gid, g] of Object.entries(data.graphs)) {
+                        const graph = g as any;
+                        if (!graph.id || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) {
+                            throw new Error(`Invalid graph: ${gid}`);
+                        }
+                        for (const n of graph.nodes) {
+                            if (!n.id || !n.type || !n.title || typeof n.x !== 'number' || typeof n.y !== 'number') {
+                                throw new Error(`Invalid node in graph ${gid}`);
+                            }
+                        }
+                        for (const e of graph.edges) {
+                            if (!e.id || !e.source || !e.target) {
+                                throw new Error(`Invalid edge in graph ${gid}`);
+                            }
+                        }
+                    }
+
                     // Sanitize: strip any prototype pollution
                     const clean = JSON.parse(JSON.stringify(data));
                     set(clean);
