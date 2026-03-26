@@ -91,7 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan }
                 <button
                     onClick={() => setShowSettings(!showSettings)}
                     className={clsx(
-                        "p-1.5 rounded-md transition-colors",
+                        "p-1.5 rounded-md transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center",
                         showSettings
                             ? "bg-gray-700 text-white"
                             : "text-gray-500 hover:text-white hover:bg-gray-800"
@@ -144,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan }
                             />
                             <button
                                 onClick={() => setShowKey(!showKey)}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
                             >
                                 {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                             </button>
@@ -313,7 +313,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan }
                                     {projects.length > 1 && (
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(project.id); }}
-                                            className="absolute right-1 p-1 rounded text-gray-600 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-gray-800 transition-all"
+                                            className="absolute right-1 p-1 rounded text-gray-600 opacity-0 group-hover:opacity-100 touch:opacity-70 hover:text-red-400 hover:bg-gray-800 transition-all touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
                                             title="Delete project"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />

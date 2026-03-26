@@ -53,6 +53,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     const connectMode = useWorkspaceStore(state => state.connectMode);
     const setConnectSource = useWorkspaceStore(state => state.setConnectSource);
     const clearConnectMode = useWorkspaceStore(state => state.clearConnectMode);
+    const executionMode = useWorkspaceStore(state => state.executionMode);
 
     const reactFlowInstance = useReactFlow();
 
@@ -433,8 +434,8 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
 
         const handleTouchStart = (e: TouchEvent) => {
             const touch = e.touches[0];
-            // Only detect swipes starting from the left edge (first 30px)
-            if (touch.clientX > 30) return;
+            // Only detect swipes starting from the left edge (50px to avoid conflict with iOS Safari back gesture)
+            if (touch.clientX > 50) return;
             startX = touch.clientX;
             startY = touch.clientY;
         };
@@ -445,8 +446,8 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
             const dx = touch.clientX - startX;
             const dy = Math.abs(touch.clientY - startY);
             startX = 0;
-            // Require horizontal swipe >80px with minimal vertical movement
-            if (dx > 80 && dy < 50) {
+            // Require horizontal swipe >100px with minimal vertical movement
+            if (dx > 100 && dy < 50) {
                 navigateBack();
                 try { navigator.vibrate(10); } catch {}
             }
@@ -760,8 +761,8 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 />
             )}
 
-            {/* Mobile: floating fit-view button */}
-            {isTouchDevice && (
+            {/* Mobile: floating fit-view button (hidden when execution panel is showing) */}
+            {isTouchDevice && !(executionMode && navStack.length >= 2) && (
                 <button
                     onClick={handleFitView}
                     className="fixed z-[80] w-11 h-11 rounded-full bg-gray-800 border border-gray-600 text-gray-300 shadow-lg flex items-center justify-center active:bg-gray-700 active:scale-95 transition-all"
@@ -775,8 +776,8 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 </button>
             )}
 
-            {/* FAB for quick-add on touch devices */}
-            {isTouchDevice && <FloatingActionButton onSubmit={handleFabAdd} />}
+            {/* FAB for quick-add on touch devices (hidden when execution panel is showing) */}
+            {isTouchDevice && !(executionMode && navStack.length >= 2) && <FloatingActionButton onSubmit={handleFabAdd} />}
 
             {/* Quick-add input on double-click (desktop only) */}
             {quickAdd && (
