@@ -153,22 +153,27 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
 
         if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
 
-        selectedEdges.forEach(edge => removeEdge(edge.id));
+        const doDelete = () => {
+            selectedEdges.forEach(edge => removeEdge(edge.id));
+            if (selectedNodes.length > 0) {
+                removeNodes(selectedNodes.map(n => n.id));
+            }
+            setHasSelection(false);
+        };
 
         if (selectedNodes.length > 0) {
-            const nodeIds = selectedNodes.map(n => n.id);
             const hasContainers = selectedNodes.some(n => n.type === 'container');
             if (hasContainers) {
                 setConfirmAction({
                     title: 'Delete Nodes',
                     message: `Delete ${selectedNodes.length} node(s)? Container nodes and their children will be removed.`,
-                    onConfirm: () => removeNodes(nodeIds),
+                    onConfirm: doDelete,
                 });
                 return;
             }
-            removeNodes(nodeIds);
         }
-    }, [reactFlowInstance, removeEdge, removeNodes]);
+        doDelete();
+    }, [reactFlowInstance, removeEdge, removeNodes, setHasSelection]);
 
     // Keyboard shortcuts: delete, undo, redo
     useEffect(() => {
@@ -176,15 +181,17 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
             const target = e.target as HTMLElement;
             const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
-            // Undo: Ctrl/Cmd+Z
+            // Undo: Ctrl/Cmd+Z (skip when typing so browser handles native text undo)
             if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+                if (isTyping) return;
                 e.preventDefault();
                 useWorkspaceStore.temporal.getState().undo();
                 return;
             }
 
-            // Redo: Ctrl/Cmd+Shift+Z
+            // Redo: Ctrl/Cmd+Shift+Z (skip when typing so browser handles native text redo)
             if (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+                if (isTyping) return;
                 e.preventDefault();
                 useWorkspaceStore.temporal.getState().redo();
                 return;
