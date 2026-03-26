@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { X, Copy, Check, Maximize2 } from 'lucide-react';
 import { useKeyboardOffset } from '../../hooks/useKeyboardOffset';
+import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
 interface NotesEditorProps {
     notes: string;
@@ -122,8 +123,10 @@ const ExpandedNotesModal = ({ value, onChange, onSave, onClose, accentColor }: {
 };
 
 export const NotesEditor = ({ notes, onSave, onClose, accentColor = 'slate' }: NotesEditorProps) => {
+    const { isTouchDevice } = useDeviceDetect();
     const [value, setValue] = useState(notes);
-    const [expanded, setExpanded] = useState(false);
+    // On touch devices, start in expanded modal to avoid popover overflow
+    const [expanded, setExpanded] = useState(isTouchDevice);
     const [copied, setCopied] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
