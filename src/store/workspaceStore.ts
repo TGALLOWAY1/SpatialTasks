@@ -39,11 +39,11 @@ interface WorkspaceState extends Workspace {
 
     // Graph edits
     addNode: (node: Node) => void;
-    updateNode: (nodeId: string, data: Partial<Node>) => void;
-    removeNode: (nodeId: string) => void;
+    updateNode: (nodeId: string, data: Partial<Node>, graphId?: string) => void;
+    removeNode: (nodeId: string, graphId?: string) => void;
     removeEdge: (edgeId: string) => void;
     removeNodes: (nodeIds: string[]) => void;
-    cycleNodeStatus: (nodeId: string) => void;
+    cycleNodeStatus: (nodeId: string, graphId?: string) => void;
     batchUpdateNodes: (nodeIds: string[], data: Partial<Node>) => void;
     batchUpdatePositions: (updates: Array<{ id: string; x: number; y: number }>) => void;
     addGraph: (graph: Graph) => void;
@@ -264,45 +264,49 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 });
             },
 
-            updateNode: (nodeId, data) => {
+            updateNode: (nodeId, data, graphId?) => {
                 const { activeGraphId, graphs } = get();
-                if (!activeGraphId) return;
+                const targetGraphId = graphId || activeGraphId;
+                if (!targetGraphId) return;
 
-                const graph = graphs[activeGraphId];
+                const graph = graphs[targetGraphId];
+                if (!graph) return;
                 const updatedNodes = graph.nodes.map(n => n.id === nodeId ? { ...n, ...data } : n);
 
                 set({
-                    graphs: { ...graphs, [activeGraphId]: { ...graph, nodes: updatedNodes } }
+                    graphs: { ...graphs, [targetGraphId]: { ...graph, nodes: updatedNodes } }
                 });
             },
 
-            removeNode: (nodeId) => {
+            removeNode: (nodeId, graphId?) => {
                 const { activeGraphId, graphs } = get();
-                if (!activeGraphId) return;
+                const targetGraphId = graphId || activeGraphId;
+                if (!targetGraphId) return;
 
-                const graph = graphs[activeGraphId];
+                const graph = graphs[targetGraphId];
+                if (!graph) return;
                 const node = graph.nodes.find(n => n.id === nodeId);
                 if (!node) return;
 
                 // Collect descendant graph IDs for containers
                 const graphIdsToDelete: string[] = [];
-                const collectDescendantGraphIds = (graphId: string) => {
-                    const g = graphs[graphId];
+                const collectDescendantGraphIds = (gId: string) => {
+                    const g = graphs[gId];
                     if (!g) return;
-                    graphIdsToDelete.push(graphId);
+                    graphIdsToDelete.push(gId);
                     g.nodes.forEach(n => {
                         if (n.childGraphId) collectDescendantGraphIds(n.childGraphId);
                     });
                 };
                 if (node.childGraphId) collectDescendantGraphIds(node.childGraphId);
 
-                // Remove node and its connected edges from the active graph
+                // Remove node and its connected edges from the target graph
                 const updatedNodes = graph.nodes.filter(n => n.id !== nodeId);
                 const updatedEdges = graph.edges.filter(e => e.source !== nodeId && e.target !== nodeId);
 
                 const updatedGraphs = {
                     ...graphs,
-                    [activeGraphId]: { ...graph, nodes: updatedNodes, edges: updatedEdges }
+                    [targetGraphId]: { ...graph, nodes: updatedNodes, edges: updatedEdges }
                 };
 
                 // Delete descendant graphs
@@ -362,11 +366,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 set({ graphs: updatedGraphs });
             },
 
-            cycleNodeStatus: (nodeId) => {
+            cycleNodeStatus: (nodeId, graphId?) => {
                 const { activeGraphId, graphs } = get();
-                if (!activeGraphId) return;
+                const targetGraphId = graphId || activeGraphId;
+                if (!targetGraphId) return;
 
-                const graph = graphs[activeGraphId];
+                const graph = graphs[targetGraphId];
+                if (!graph) return;
                 const node = graph.nodes.find(n => n.id === nodeId);
                 if (!node || !node.status) return;
 
@@ -381,7 +387,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     n.id === nodeId ? { ...n, status: nextStatus as any } : n
                 );
                 set({
-                    graphs: { ...graphs, [activeGraphId]: { ...graph, nodes: updatedNodes } }
+                    graphs: { ...graphs, [targetGraphId]: { ...graph, nodes: updatedNodes } }
                 });
             },
 

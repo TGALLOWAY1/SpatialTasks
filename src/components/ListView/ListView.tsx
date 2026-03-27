@@ -4,7 +4,7 @@ import { Node, Graph } from '../../types';
 import { isNodeBlocked, getContainerProgress } from '../../utils/logic';
 import {
     CheckCircle2, Circle, Clock, Lock, Layers, ArrowRightCircle,
-    Pencil, Sparkles, Loader2, ChevronRight, ChevronDown, GitBranch, Trash2,
+    Pencil, Sparkles, Loader2, ChevronRight, ChevronDown, GitBranch, Trash2, EyeOff, Eye,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
@@ -94,7 +94,7 @@ function getParallelCounts(items: { node: Node; depth: number }[]): Map<number, 
     return counts;
 }
 
-const ActionItem: React.FC<{ node: Node; blocked: boolean; depth: number; isParallel: boolean }> = ({ node, blocked, depth, isParallel }) => {
+const ActionItem: React.FC<{ node: Node; blocked: boolean; depth: number; isParallel: boolean; graphId?: string }> = ({ node, blocked, depth, isParallel, graphId }) => {
     const cycleNodeStatus = useWorkspaceStore(state => state.cycleNodeStatus);
     const updateNode = useWorkspaceStore(state => state.updateNode);
     const removeNode = useWorkspaceStore(state => state.removeNode);
@@ -103,15 +103,15 @@ const ActionItem: React.FC<{ node: Node; blocked: boolean; depth: number; isPara
 
     const handleStatusClick = useCallback(() => {
         if (blocked) return;
-        cycleNodeStatus(node.id);
-    }, [blocked, cycleNodeStatus, node.id]);
+        cycleNodeStatus(node.id, graphId);
+    }, [blocked, cycleNodeStatus, node.id, graphId]);
 
     const save = useCallback(() => {
         if (editValue.trim() && editValue.trim() !== node.title) {
-            updateNode(node.id, { title: editValue.trim() });
+            updateNode(node.id, { title: editValue.trim() }, graphId);
         }
         setEditing(false);
-    }, [editValue, node.title, node.id, updateNode]);
+    }, [editValue, node.title, node.id, updateNode, graphId]);
 
     return (
         <div
@@ -175,7 +175,7 @@ const ActionItem: React.FC<{ node: Node; blocked: boolean; depth: number; isPara
                 </button>
             )}
             <button
-                onClick={() => removeNode(node.id)}
+                onClick={() => removeNode(node.id, graphId)}
                 className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0 touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
                 title="Delete task"
             >
@@ -191,7 +191,8 @@ const ContainerItem: React.FC<{
     isParallel: boolean;
     expanded: boolean;
     onToggle: () => void;
-}> = ({ node, depth, isParallel, expanded, onToggle }) => {
+    graphId?: string;
+}> = ({ node, depth, isParallel, expanded, onToggle, graphId }) => {
     const enterGraph = useWorkspaceStore(state => state.enterGraph);
     const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
     const graphs = useWorkspaceStore(state => state.graphs);
@@ -216,16 +217,17 @@ const ContainerItem: React.FC<{
 
     const saveTitle = useCallback(() => {
         if (editValue.trim() && editValue.trim() !== node.title) {
-            updateNode(node.id, { title: editValue.trim() });
+            updateNode(node.id, { title: editValue.trim() }, graphId);
         }
         setEditing(false);
-    }, [editValue, node.title, node.id, updateNode]);
+    }, [editValue, node.title, node.id, updateNode, graphId]);
 
     const handleEnter = () => {
         if (node.childGraphId) {
             enterGraph(node.childGraphId, node.id, node.title);
         } else {
-            const currentGraph = activeGraphId ? graphs[activeGraphId] : null;
+            const ownerGraphId = graphId || activeGraphId;
+            const currentGraph = ownerGraphId ? graphs[ownerGraphId] : null;
             const projectId = currentGraph?.projectId || '';
             const childGraphId = uuidv4();
             const childGraph: Graph = {
@@ -233,7 +235,7 @@ const ContainerItem: React.FC<{
                 nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 },
             };
             addGraph(childGraph);
-            updateNode(node.id, { childGraphId });
+            updateNode(node.id, { childGraphId }, graphId);
             enterGraph(childGraphId, node.id, node.title);
         }
     };
@@ -274,7 +276,7 @@ const ContainerItem: React.FC<{
                 });
             });
             addGraph(childGraph);
-            updateNode(node.id, { childGraphId });
+            updateNode(node.id, { childGraphId }, graphId);
             enterGraph(childGraphId, node.id, node.title);
             addToast(`Generated ${result.subtasks.length} subtasks for "${node.title}"`, 'success');
         } catch (err) {
@@ -399,7 +401,7 @@ const ContainerItem: React.FC<{
                     message={`Delete "${node.title}" and all its children? This cannot be undone.`}
                     confirmLabel="Delete"
                     danger
-                    onConfirm={() => { setShowDeleteConfirm(false); removeNode(node.id); }}
+                    onConfirm={() => { setShowDeleteConfirm(false); removeNode(node.id, graphId); }}
                     onCancel={() => setShowDeleteConfirm(false)}
                 />
             )}
@@ -415,14 +417,24 @@ const ExpandedChildren: React.FC<{
     parentDepth: number;
     expandedContainers: Set<string>;
     toggleExpand: (id: string) => void;
-}> = ({ childGraphId, parentDepth, expandedContainers, toggleExpand }) => {
+    hideCompleted: boolean;
+}> = ({ childGraphId, parentDepth, expandedContainers, toggleExpand, hideCompleted }) => {
     const graphs = useWorkspaceStore(state => state.graphs);
     const childGraph = graphs[childGraphId];
 
     const sortedItems = useMemo(() => {
         if (!childGraph) return [];
-        return topoSortWithDepth(childGraph);
-    }, [childGraph]);
+        const items = topoSortWithDepth(childGraph);
+        if (!hideCompleted) return items;
+        return items.filter(({ node }) => {
+            if (node.type === 'action') return node.status !== 'done';
+            if (node.type === 'container' && node.childGraphId) {
+                const progress = getContainerProgress(node, { graphs } as any);
+                return progress < 1;
+            }
+            return true;
+        });
+    }, [childGraph, hideCompleted, graphs]);
 
     const parallelCounts = useMemo(() => getParallelCounts(sortedItems), [sortedItems]);
 
@@ -441,8 +453,9 @@ const ExpandedChildren: React.FC<{
         <div className="space-y-2">
             {/* Subtle connector line */}
             {sortedItems.map(({ node, depth }) => {
-                const itemDepth = parentDepth + 1 + depth;
                 const isParallel = (parallelCounts.get(depth) ?? 0) > 1;
+                // Subtasks are indented one level from parent; parallel tasks get a small extra indent
+                const itemDepth = parentDepth + 1 + (isParallel ? 1 : 0);
 
                 if (node.type === 'container') {
                     const isExpanded = expandedContainers.has(node.id);
@@ -454,6 +467,7 @@ const ExpandedChildren: React.FC<{
                                 isParallel={isParallel}
                                 expanded={isExpanded}
                                 onToggle={() => toggleExpand(node.id)}
+                                graphId={childGraphId}
                             />
                             {isExpanded && node.childGraphId && (
                                 <ExpandedChildren
@@ -461,6 +475,7 @@ const ExpandedChildren: React.FC<{
                                     parentDepth={itemDepth}
                                     expandedContainers={expandedContainers}
                                     toggleExpand={toggleExpand}
+                                    hideCompleted={hideCompleted}
                                 />
                             )}
                         </div>
@@ -475,6 +490,7 @@ const ExpandedChildren: React.FC<{
                         blocked={blocked}
                         depth={itemDepth}
                         isParallel={isParallel}
+                        graphId={childGraphId}
                     />
                 );
             })}
@@ -490,6 +506,7 @@ export const ListView: React.FC = () => {
     const graph = activeGraphId ? graphs[activeGraphId] : null;
 
     const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [hideCompleted, setHideCompleted] = useState(false);
     const [expandedContainers, setExpandedContainers] = useState<Set<string>>(new Set());
 
     const toggleExpand = useCallback((id: string) => {
@@ -504,8 +521,17 @@ export const ListView: React.FC = () => {
     // Topologically sort nodes with depth for dependency-aware ordering
     const sortedItems = useMemo(() => {
         if (!graph) return [];
-        return topoSortWithDepth(graph);
-    }, [graph]);
+        const items = topoSortWithDepth(graph);
+        if (!hideCompleted) return items;
+        return items.filter(({ node }) => {
+            if (node.type === 'action') return node.status !== 'done';
+            if (node.type === 'container' && node.childGraphId) {
+                const progress = getContainerProgress(node, { graphs } as any);
+                return progress < 1;
+            }
+            return true;
+        });
+    }, [graph, hideCompleted, graphs]);
 
     const parallelCounts = useMemo(() => getParallelCounts(sortedItems), [sortedItems]);
 
@@ -554,11 +580,23 @@ export const ListView: React.FC = () => {
                         <span className="text-xs text-gray-400">
                             {doneCount} of {totalActions} tasks complete
                         </span>
-                        <div className="h-1.5 w-24 bg-gray-800 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-green-500 transition-all duration-500"
-                                style={{ width: `${totalActions > 0 ? (doneCount / totalActions) * 100 : 0}%` }}
-                            />
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setHideCompleted(h => !h)}
+                                className={clsx(
+                                    'transition-colors p-1 rounded touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center',
+                                    hideCompleted ? 'text-purple-400 hover:text-purple-300' : 'text-gray-500 hover:text-gray-300',
+                                )}
+                                title={hideCompleted ? 'Show completed tasks' : 'Hide completed tasks'}
+                            >
+                                {hideCompleted ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                            <div className="h-1.5 w-24 bg-gray-800 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-green-500 transition-all duration-500"
+                                    style={{ width: `${totalActions > 0 ? (doneCount / totalActions) * 100 : 0}%` }}
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
@@ -573,7 +611,7 @@ export const ListView: React.FC = () => {
                             <div key={node.id}>
                                 <ContainerItem
                                     node={node}
-                                    depth={depth}
+                                    depth={0}
                                     isParallel={isParallel}
                                     expanded={isExpanded}
                                     onToggle={() => toggleExpand(node.id)}
@@ -583,13 +621,14 @@ export const ListView: React.FC = () => {
                                         {/* Vertical connector line for nesting */}
                                         <div
                                             className="absolute top-0 bottom-0 border-l-2 border-indigo-800/40"
-                                            style={{ left: (depth + 1) * 24 + 8 }}
+                                            style={{ left: 24 + 8 }}
                                         />
                                         <ExpandedChildren
                                             childGraphId={node.childGraphId}
-                                            parentDepth={depth}
+                                            parentDepth={0}
                                             expandedContainers={expandedContainers}
                                             toggleExpand={toggleExpand}
+                                            hideCompleted={hideCompleted}
                                         />
                                     </div>
                                 )}
@@ -602,7 +641,7 @@ export const ListView: React.FC = () => {
                             key={node.id}
                             node={node}
                             blocked={blocked}
-                            depth={depth}
+                            depth={0}
                             isParallel={isParallel}
                         />
                     );

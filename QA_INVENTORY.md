@@ -26,7 +26,7 @@ No URL router — single-page app with in-memory navigation stack.
 | Auth (Login/Signup) | No session | `AuthScreen.tsx`, `AuthGate.tsx` |
 | Password Reset | Recovery token | `ResetPasswordScreen.tsx` |
 | Graph View (Canvas) | Default, viewMode='graph' | `CanvasArea.tsx` |
-| List View | viewMode='list' | `ListView.tsx` |
+| List View | viewMode='list'; subtask interaction via graphId-aware store methods | `ListView.tsx` + `workspaceStore.ts` |
 | Execution Mode | executionMode toggle | `CanvasArea.tsx` + `StepDetailPanel.tsx` |
 
 ## Components (23 total)
