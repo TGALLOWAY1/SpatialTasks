@@ -4,7 +4,7 @@ import { Node, Graph } from '../../types';
 import { isNodeBlocked, getContainerProgress } from '../../utils/logic';
 import {
     CheckCircle2, Circle, Clock, Lock, Layers, ArrowRightCircle,
-    Pencil, Sparkles, Loader2, ChevronRight, ChevronDown, GitBranch, Trash2,
+    Pencil, Sparkles, Loader2, ChevronRight, ChevronDown, GitBranch, Trash2, EyeOff, Eye,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
@@ -417,14 +417,24 @@ const ExpandedChildren: React.FC<{
     parentDepth: number;
     expandedContainers: Set<string>;
     toggleExpand: (id: string) => void;
-}> = ({ childGraphId, parentDepth, expandedContainers, toggleExpand }) => {
+    hideCompleted: boolean;
+}> = ({ childGraphId, parentDepth, expandedContainers, toggleExpand, hideCompleted }) => {
     const graphs = useWorkspaceStore(state => state.graphs);
     const childGraph = graphs[childGraphId];
 
     const sortedItems = useMemo(() => {
         if (!childGraph) return [];
-        return topoSortWithDepth(childGraph);
-    }, [childGraph]);
+        const items = topoSortWithDepth(childGraph);
+        if (!hideCompleted) return items;
+        return items.filter(({ node }) => {
+            if (node.type === 'action') return node.status !== 'done';
+            if (node.type === 'container' && node.childGraphId) {
+                const progress = getContainerProgress(node, { graphs } as any);
+                return progress < 1;
+            }
+            return true;
+        });
+    }, [childGraph, hideCompleted, graphs]);
 
     const parallelCounts = useMemo(() => getParallelCounts(sortedItems), [sortedItems]);
 
@@ -465,6 +475,7 @@ const ExpandedChildren: React.FC<{
                                     parentDepth={itemDepth}
                                     expandedContainers={expandedContainers}
                                     toggleExpand={toggleExpand}
+                                    hideCompleted={hideCompleted}
                                 />
                             )}
                         </div>
@@ -495,6 +506,7 @@ export const ListView: React.FC = () => {
     const graph = activeGraphId ? graphs[activeGraphId] : null;
 
     const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [hideCompleted, setHideCompleted] = useState(false);
     const [expandedContainers, setExpandedContainers] = useState<Set<string>>(new Set());
 
     const toggleExpand = useCallback((id: string) => {
@@ -509,8 +521,17 @@ export const ListView: React.FC = () => {
     // Topologically sort nodes with depth for dependency-aware ordering
     const sortedItems = useMemo(() => {
         if (!graph) return [];
-        return topoSortWithDepth(graph);
-    }, [graph]);
+        const items = topoSortWithDepth(graph);
+        if (!hideCompleted) return items;
+        return items.filter(({ node }) => {
+            if (node.type === 'action') return node.status !== 'done';
+            if (node.type === 'container' && node.childGraphId) {
+                const progress = getContainerProgress(node, { graphs } as any);
+                return progress < 1;
+            }
+            return true;
+        });
+    }, [graph, hideCompleted, graphs]);
 
     const parallelCounts = useMemo(() => getParallelCounts(sortedItems), [sortedItems]);
 
@@ -559,11 +580,23 @@ export const ListView: React.FC = () => {
                         <span className="text-xs text-gray-400">
                             {doneCount} of {totalActions} tasks complete
                         </span>
-                        <div className="h-1.5 w-24 bg-gray-800 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-green-500 transition-all duration-500"
-                                style={{ width: `${totalActions > 0 ? (doneCount / totalActions) * 100 : 0}%` }}
-                            />
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setHideCompleted(h => !h)}
+                                className={clsx(
+                                    'transition-colors p-1 rounded touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center',
+                                    hideCompleted ? 'text-purple-400 hover:text-purple-300' : 'text-gray-500 hover:text-gray-300',
+                                )}
+                                title={hideCompleted ? 'Show completed tasks' : 'Hide completed tasks'}
+                            >
+                                {hideCompleted ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                            <div className="h-1.5 w-24 bg-gray-800 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-green-500 transition-all duration-500"
+                                    style={{ width: `${totalActions > 0 ? (doneCount / totalActions) * 100 : 0}%` }}
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
@@ -595,6 +628,7 @@ export const ListView: React.FC = () => {
                                             parentDepth={0}
                                             expandedContainers={expandedContainers}
                                             toggleExpand={toggleExpand}
+                                            hideCompleted={hideCompleted}
                                         />
                                     </div>
                                 )}
