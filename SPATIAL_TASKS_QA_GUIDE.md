@@ -950,3 +950,59 @@ OVERALL
 - Entire workspace serialized to localStorage on every persist — large workspaces slow this down
 
 **Likelihood**: Medium (depends on usage). **Impact**: High (app feels broken).
+
+---
+
+## 8. What Should Be Automated Later
+
+> Spatial Tasks currently has **zero test coverage** (Playwright is installed but unused). These recommendations are ordered by value — start from the top.
+
+### Unit Tests (Vitest recommended)
+
+| What to Test | File(s) | Why It Matters | Bugs It Would Catch | Priority |
+|-------------|---------|---------------|---------------------|----------|
+| **Workspace store mutations** | `src/store/workspaceStore.ts` | Core data logic — every feature depends on it | Orphaned graphs on delete, missing edge cleanup, navStack corruption | P0 |
+| **Blocking/actionable logic** | `src/utils/logic.ts` | Determines execution mode behavior and visual state | Wrong blocked/actionable status, progress calculation errors | P0 |
+| **Draft-to-canvas conversion** | `src/utils/draftUtils.ts` | AI-generated flows become real projects through this | Missing nodes, wrong hierarchy, broken edge references | P1 |
+| **Markdown parser** | `src/utils/markdownParser.ts` | User imports depend on correct parsing | Malformed import, lost content, wrong nesting | P1 |
+| **Workspace sync utilities** | `src/lib/workspaceSync.ts` | Persistence correctness | Gemini key leaking to Supabase, debounce not resetting, version conflicts | P1 |
+| **JSON import validation** | `src/store/workspaceStore.ts` (`jsonImport`) | Data integrity on import | Corrupted workspace from bad input, partial import | P2 |
+
+### Integration Tests (Vitest + React Testing Library)
+
+| What to Test | Component(s) | Why It Matters | Bugs It Would Catch | Priority |
+|-------------|-------------|---------------|---------------------|----------|
+| **Status cycling** | `ActionNode` + `workspaceStore` | Most common user interaction | Status not persisting, wrong cycle order, UI not updating | P0 |
+| **Node CRUD** | `CanvasArea` + `workspaceStore` | Core feature | Nodes not appearing, positions wrong, IDs conflicting | P0 |
+| **Edge creation/dedup** | `CanvasArea` + `workspaceStore` | Connection logic | Duplicate edges, self-connections, missing edges | P1 |
+| **View mode consistency** | `CanvasArea` + `ListView` + store | Two views share state | Stale data in one view, missing nodes, wrong sort order | P1 |
+| **Project switching** | `Sidebar` + `workspaceStore` | Multi-project support | Data from wrong project shown, navStack not reset | P1 |
+| **Undo/redo with persistence** | Store + temporal middleware | Undo interacts with save pipeline | Undone state auto-saved, redo lost after new action | P2 |
+
+### End-to-End Tests (Playwright — already installed)
+
+| What to Test | Why It Matters | Bugs It Would Catch | Priority |
+|-------------|---------------|---------------------|----------|
+| **Full task lifecycle** (create → edit → status → delete → undo) | Covers the core happy path | Regression in any step of the main workflow | P0 |
+| **Persistence across refresh** (create tasks → refresh → verify) | Users expect data to survive | localStorage/Supabase sync failures, hydration bugs | P0 |
+| **Container navigation** (create container → enter → add child → navigate back) | Key differentiating feature | NavStack corruption, viewport not restoring, orphaned graphs | P1 |
+| **Connect mode flow** (enable → source → target → edge appears → disable) | Complex multi-step interaction | Mode getting stuck, drag disabled permanently | P1 |
+| **Project management** (create → switch → rename → delete) | Multi-project support | Data loss on switch, last-project delete not blocked | P1 |
+| **Mobile smoke test** (FAB → create → long-press → action sheet) | Touch-specific flows | Gesture conflicts, FAB not working, action sheet bugs | P2 |
+
+### Visual Regression Tests (Playwright + screenshot comparison)
+
+| What to Test | Why It Matters | Bugs It Would Catch | Priority |
+|-------------|---------------|---------------------|----------|
+| **Node rendering** (action, container, selected, blocked, done states) | Visual correctness of all node states | Styling regressions, missing icons, wrong colors | P1 |
+| **Empty states** (canvas, list view) | First impression | Missing or broken empty state UI | P2 |
+| **Mobile layout** (sidebar drawer, FAB, action sheet, bottom sheet) | Mobile-specific components | Safe-area issues, overflow, z-index bugs | P2 |
+| **TopBar states** (breadcrumbs at various depths, execution mode on/off) | Navigation UI correctness | Breadcrumb overflow, mode indicator bugs | P2 |
+
+### Recommended Implementation Order
+
+1. **Week 1**: Unit tests for `workspaceStore` mutations and `utils/logic.ts` — highest ROI, catches most critical bugs
+2. **Week 2**: Playwright E2E for task lifecycle and persistence — catches regression in the core flow
+3. **Week 3**: Integration tests for status cycling, node CRUD, view consistency
+4. **Week 4**: Playwright E2E for container navigation and connect mode
+5. **Ongoing**: Visual regression screenshots for node states and mobile layout
