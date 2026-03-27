@@ -40,6 +40,7 @@ export const StepDetailPanel: React.FC = () => {
     const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
     const cycleNodeStatus = useWorkspaceStore(state => state.cycleNodeStatus);
     const batchUpdateNodes = useWorkspaceStore(state => state.batchUpdateNodes);
+    const updateNode = useWorkspaceStore(state => state.updateNode);
     const navigateBack = useWorkspaceStore(state => state.navigateBack);
 
     const [collapsed, setCollapsed] = useState(false);
@@ -114,8 +115,13 @@ export const StepDetailPanel: React.FC = () => {
             batchUpdateNodes(notDoneIds, { status: 'done' });
         }
 
-        // Navigate back to parent
+        // Navigate back to parent (activeGraphId becomes parent graph)
         navigateBack(1);
+
+        // Mark the container node as done in the parent graph
+        if (containerNodeId) {
+            updateNode(containerNodeId, { status: 'done' });
+        }
 
         // Dispatch advance event after a short delay to let state propagate
         setTimeout(() => {
@@ -125,7 +131,7 @@ export const StepDetailPanel: React.FC = () => {
                 })
             );
         }, 150);
-    }, [activeGraphId, graphs, batchUpdateNodes, navigateBack, navStack]);
+    }, [activeGraphId, graphs, batchUpdateNodes, updateNode, navigateBack, navStack]);
 
     // Don't show unless in execution mode and inside a container
     if (!executionMode || navStack.length < 2) return null;
