@@ -509,3 +509,162 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 | QA-D019 | Destructive Actions | Confirm modal for container deletion | Canvas has a container with child nodes | 1. Right-click container node 2. Select "Delete" 3. ConfirmModal appears warning about child nodes 4. Click Confirm | Container and all child nodes removed; action is undoable via Ctrl+Z | Modal should clearly state that children will also be deleted; Cancel should abort with no changes | P0 |
 | QA-D020 | Destructive Actions | Cancel project deletion | Multiple projects exist | 1. Right-click project in sidebar 2. Select "Delete" 3. ConfirmModal appears 4. Click Cancel | Project is NOT deleted; modal closes; everything unchanged | Confirm button should be visually distinct (red/danger styling); project name should be mentioned in warning | P0 |
 | QA-D021 | Destructive Actions | Workspace reset | Workspace has data | 1. Open settings 2. Select "Reset Workspace" 3. ConfirmModal appears 4. Confirm | Entire workspace cleared — all projects, nodes, edges removed; app returns to fresh/empty state | This is irreversible; warning must be very clear; localStorage and Supabase data both cleared | P1 |
+
+---
+
+## 4. 30-Minute Smoke Test
+
+> Run this before sharing the app with anyone. Covers the highest-risk flows that would break a demo.
+
+### Setup (2 min)
+1. Open the app in Chrome desktop + have a mobile device or emulator ready
+2. Ensure you have a test account (or use `VITE_SKIP_AUTH=true` locally)
+3. Start with a fresh workspace (or reset via Settings → Reset Workspace)
+
+### Desktop Smoke Test (15 min)
+
+| # | What to test | Steps | Pass? |
+|---|-------------|-------|-------|
+| 1 | **Login** | Log in with test credentials. Verify workspace loads. | ☐ |
+| 2 | **Empty state** | Confirm empty canvas shows "Double-click to add a task" message. | ☐ |
+| 3 | **Create task** | Double-click canvas → type "Smoke test task" → Enter. Node appears at click position. | ☐ |
+| 4 | **Edit task** | Double-click the node → change title → click away. Title persists. | ☐ |
+| 5 | **Status cycle** | Click the status icon 3 times. Verify: todo → in_progress → done → todo. | ☐ |
+| 6 | **Create 3 more tasks** | Add "Task B", "Task C", "Task D" at different positions. | ☐ |
+| 7 | **Drag a node** | Drag "Task B" to a new position. Verify it stays. | ☐ |
+| 8 | **Create edge** | Drag from Task B's source handle to Task C's target handle. Edge appears. | ☐ |
+| 9 | **Pan and zoom** | Scroll to zoom. Drag empty canvas to pan. Press Ctrl+Shift+F to fit all. | ☐ |
+| 10 | **Create container** | Right-click canvas → add container. Give it a title. | ☐ |
+| 11 | **Enter container** | Click the enter-subgraph arrow on the container. Breadcrumbs update. | ☐ |
+| 12 | **Add task inside** | Double-click inside the subgraph to add a child task. | ☐ |
+| 13 | **Navigate back** | Click the root breadcrumb. Verify you return to the parent graph. | ☐ |
+| 14 | **Delete a node** | Select a node → press Delete. Node removed. | ☐ |
+| 15 | **Undo** | Press Ctrl+Z. Deleted node reappears. | ☐ |
+| 16 | **Switch to list view** | Toggle to list view. Verify all tasks appear. | ☐ |
+| 17 | **Status in list** | Toggle a status in list view → switch back to graph. Status matches. | ☐ |
+| 18 | **Refresh persistence** | Hard refresh (Ctrl+Shift+R). All nodes, edges, positions restored. | ☐ |
+| 19 | **Create second project** | Open sidebar → create new project. Verify canvas clears. | ☐ |
+| 20 | **Switch projects** | Click back to first project. All data intact. | ☐ |
+
+### Mobile Smoke Test (10 min)
+
+| # | What to test | Steps | Pass? |
+|---|-------------|-------|-------|
+| 21 | **Mobile load** | Open app on phone. Verify it loads and is usable. | ☐ |
+| 22 | **Sidebar drawer** | Tap hamburger menu. Sidebar opens as drawer. Tap outside to close. | ☐ |
+| 23 | **FAB task creation** | Tap FAB (+). Enter a task in bottom sheet. Confirm it appears on canvas. | ☐ |
+| 24 | **Touch pan/zoom** | Drag to pan. Pinch to zoom. Both feel responsive. | ☐ |
+| 25 | **Long-press menu** | Long-press a node. Action sheet appears with options. | ☐ |
+| 26 | **Status cycle (touch)** | Tap status icon. Verify cycle + vibration feedback. | ☐ |
+| 27 | **Swipe back** | Enter a container → swipe from left edge → returns to parent. | ☐ |
+| 28 | **Safe areas** | Verify no content hidden behind notch or home indicator. | ☐ |
+| 29 | **Refresh** | Refresh mobile browser. All data persists. | ☐ |
+| 30 | **Empty state (mobile)** | Create empty project. Verify "Tap +" message shows. | ☐ |
+
+### Smoke Test Exit Criteria
+- All 30 checks pass → **safe to demo**
+- Any P0 failure (items 1-3, 5, 7-8, 18, 21, 23-24) → **fix before sharing**
+- Non-P0 failures → **note and share with caveats**
+
+---
+
+## 5. Full Pre-Release Checklist
+
+> Complete this before any public release or major user testing round.
+
+### Core Flows
+- [ ] User can sign up, log in, and reset password
+- [ ] Session persists across browser restart
+- [ ] Workspace loads correctly after authentication
+- [ ] New user sees proper empty state with guidance
+- [ ] Tasks can be created, edited, and deleted on desktop
+- [ ] Tasks can be created via FAB on mobile
+- [ ] Status cycling works (todo → in_progress → done → todo)
+- [ ] Nodes can be dragged and repositioned
+- [ ] Edges can be created via handle drag and connect mode
+- [ ] Edges can be deleted via keyboard and context menu
+- [ ] Container nodes can be entered and navigated out of
+- [ ] Breadcrumb navigation works at all depth levels
+- [ ] Undo/redo works for all major operations
+
+### Persistence & Data
+- [ ] Changes save to localStorage immediately
+- [ ] Supabase sync completes within ~3 seconds of last edit
+- [ ] SaveIndicator shows accurate Saving/Saved states
+- [ ] Full page refresh restores all data (nodes, edges, positions, statuses)
+- [ ] Project switching preserves data for both projects
+- [ ] Closing and reopening tab preserves workspace
+- [ ] No data loss when closing tab during debounce window (verify beforeunload warning)
+
+### Views & Modes
+- [ ] Graph ↔ List view toggle works
+- [ ] Status changes in list view reflect in graph view (and vice versa)
+- [ ] Tasks created in list view appear in graph view
+- [ ] Execution mode activates with correct panel and highlighting
+- [ ] "Next" button in execution mode navigates to correct actionable node
+- [ ] Blocked/actionable states are accurate based on dependencies
+
+### Canvas Interactions
+- [ ] Pan works with mouse drag on empty canvas
+- [ ] Zoom works with scroll wheel
+- [ ] Fit-view (Ctrl+Shift+F) centers all nodes
+- [ ] MiniMap displays and is interactive
+- [ ] Double-click creates task at correct position
+- [ ] Connect mode disables drag and enables edge creation
+- [ ] Select mode allows multi-selection
+- [ ] Backspace/Delete removes selected nodes/edges
+
+### Mobile & Responsive
+- [ ] App is usable on iPhone (Safari) and Android (Chrome)
+- [ ] Sidebar renders as drawer on small screens
+- [ ] FAB and bottom sheet work correctly
+- [ ] Long-press shows action sheet with vibration
+- [ ] Pinch-to-zoom works
+- [ ] Swipe-back navigation works from subgraphs
+- [ ] Safe-area insets prevent content from being hidden
+- [ ] Touch targets are at least 44px
+- [ ] TopBar overflow menu provides access to hidden controls
+- [ ] Keyboard doesn't obscure input fields in bottom sheets
+
+### Error Handling
+- [ ] ErrorBoundary catches crashes and shows reload button
+- [ ] Network failure shows toast error and doesn't corrupt local data
+- [ ] Invalid Gemini API key shows clear error message
+- [ ] Empty/malformed JSON import is rejected gracefully
+- [ ] Empty/malformed markdown import is handled gracefully
+- [ ] Deleting last project is blocked with clear message
+
+### Destructive Actions
+- [ ] Container deletion shows ConfirmModal with clear warning
+- [ ] Project deletion shows ConfirmModal
+- [ ] Workspace reset shows ConfirmModal
+- [ ] Cancel in all ConfirmModals leaves data untouched
+- [ ] Undo after deletion restores the deleted item
+
+### Performance
+- [ ] Canvas with 50+ nodes feels responsive during pan/zoom
+- [ ] Canvas with 100+ nodes doesn't freeze
+- [ ] Rapid node creation (10+ quickly) doesn't cause errors
+- [ ] Deep nesting (5+ levels) doesn't cause noticeable slowdown
+- [ ] Rapid project switching doesn't cause race conditions
+
+### AI Features
+- [ ] Flow generation works with valid API key
+- [ ] Generated draft can be reviewed and accepted
+- [ ] Generated draft can be rejected without side effects
+- [ ] Magic expand decomposes container into subtasks
+- [ ] Markdown import creates correct project structure
+
+### Browser Compatibility
+- [ ] Chrome (latest) — full test
+- [ ] Safari (latest) — smoke test
+- [ ] Firefox (latest) — smoke test
+- [ ] Safari iOS — mobile smoke test
+- [ ] Chrome Android — mobile smoke test
+
+### Accessibility Basics
+- [ ] All interactive elements are keyboard-reachable (Tab)
+- [ ] Focus indicators are visible
+- [ ] Color is not the only indicator of status (icons also used)
+- [ ] Text is readable at default zoom level
+- [ ] Modals trap focus and can be closed with Escape
