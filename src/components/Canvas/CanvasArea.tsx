@@ -216,6 +216,98 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 return;
             }
 
+            // Arrow keys: navigate between nodes in the workflow
+            if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                if (isTyping) return;
+                if (!graph) return;
+
+                const rfNodes = reactFlowInstance.getNodes();
+                const selected = rfNodes.filter(n => n.selected);
+                if (selected.length !== 1) return;
+
+                e.preventDefault();
+                const currentId = selected[0].id;
+                let candidates: string[] = [];
+
+                if (e.key === 'ArrowRight') {
+                    // Follow edges forward: current node is source
+                    candidates = graph.edges.filter(edge => edge.source === currentId).map(edge => edge.target);
+                } else if (e.key === 'ArrowLeft') {
+                    // Follow edges backward: current node is target
+                    candidates = graph.edges.filter(edge => edge.target === currentId).map(edge => edge.source);
+                } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    // Find siblings: nodes that share the same parent(s) or same child(ren)
+                    const parentIds = graph.edges.filter(edge => edge.target === currentId).map(edge => edge.source);
+                    const childIds = graph.edges.filter(edge => edge.source === currentId).map(edge => edge.target);
+
+                    const siblingSet = new Set<string>();
+                    // Siblings via shared parents (parallel targets from same source)
+                    for (const pid of parentIds) {
+                        graph.edges.filter(edge => edge.source === pid).forEach(edge => {
+                            if (edge.target !== currentId) siblingSet.add(edge.target);
+                        });
+                    }
+                    // Siblings via shared children (parallel sources into same target)
+                    for (const cid of childIds) {
+                        graph.edges.filter(edge => edge.target === cid).forEach(edge => {
+                            if (edge.source !== currentId) siblingSet.add(edge.source);
+                        });
+                    }
+                    candidates = Array.from(siblingSet);
+                }
+
+                if (candidates.length === 0) return;
+
+                const currentNode = graph.nodes.find(n => n.id === currentId);
+                if (!currentNode) return;
+
+                // Resolve candidate nodes with positions
+                const candidateNodes = candidates
+                    .map(id => graph.nodes.find(n => n.id === id))
+                    .filter((n): n is NonNullable<typeof n> => !!n);
+
+                if (candidateNodes.length === 0) return;
+
+                let targetNode;
+                if (e.key === 'ArrowUp') {
+                    // Pick the nearest candidate above (smaller Y), or wrap to the bottom
+                    const above = candidateNodes.filter(n => n.y < currentNode.y).sort((a, b) => b.y - a.y);
+                    targetNode = above[0] ?? candidateNodes.sort((a, b) => b.y - a.y)[0];
+                } else if (e.key === 'ArrowDown') {
+                    // Pick the nearest candidate below (larger Y), or wrap to the top
+                    const below = candidateNodes.filter(n => n.y > currentNode.y).sort((a, b) => a.y - b.y);
+                    targetNode = below[0] ?? candidateNodes.sort((a, b) => a.y - b.y)[0];
+                } else if (candidateNodes.length === 1) {
+                    targetNode = candidateNodes[0];
+                } else {
+                    // For left/right with multiple candidates, pick the one closest in Y
+                    targetNode = candidateNodes.sort((a, b) =>
+                        Math.abs(a.y - currentNode.y) - Math.abs(b.y - currentNode.y)
+                    )[0];
+                }
+
+                if (!targetNode) return;
+
+                // Select the target node and deselect all others
+                const updatedNodes = rfNodes.map(n => ({
+                    ...n,
+                    selected: n.id === targetNode!.id,
+                }));
+                reactFlowInstance.setNodes(updatedNodes);
+
+                // Pan to the newly selected node
+                const rfTarget = rfNodes.find(n => n.id === targetNode!.id);
+                if (rfTarget) {
+                    reactFlowInstance.fitView({
+                        nodes: [rfTarget],
+                        padding: 0.4,
+                        duration: 300,
+                        maxZoom: 1.5,
+                    });
+                }
+                return;
+            }
+
             // Delete: Backspace or Delete
             if (e.key !== 'Backspace' && e.key !== 'Delete') return;
             if (isTyping) return;
@@ -225,7 +317,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [deleteSelected, handleFitView]);
+    }, [deleteSelected, handleFitView, graph, reactFlowInstance]);
 
     // Listen for toolbar delete event (from TopBar delete button)
     useEffect(() => {
