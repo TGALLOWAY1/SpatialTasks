@@ -1006,3 +1006,190 @@ OVERALL
 3. **Week 3**: Integration tests for status cycling, node CRUD, view consistency
 4. **Week 4**: Playwright E2E for container navigation and connect mode
 5. **Ongoing**: Visual regression screenshots for node states and mobile layout
+
+---
+
+## 9. Test Environment and Setup Checklist
+
+### Environment Variables
+
+| Variable | Required | Source | Notes |
+|----------|----------|--------|-------|
+| `VITE_SUPABASE_URL` | Yes (production) | Supabase dashboard | e.g., `https://your-project.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | Yes (production) | Supabase dashboard | Public anon key |
+| `VITE_SKIP_AUTH` | No | Set to `true` for local dev | Bypasses auth entirely — **never use in production** |
+
+### Local Setup
+
+```bash
+# Clone and install
+git clone <repo-url> && cd SpatialTasks
+npm install
+
+# Copy env template
+cp .env.example .env
+# Edit .env with your Supabase credentials (or set VITE_SKIP_AUTH=true)
+
+# Start dev server
+npm run dev
+# App available at http://localhost:5173 (listens on all interfaces)
+```
+
+### Seed Data / Test Boards
+
+- **No seed data mechanism exists.** The app generates a default workspace on first login.
+- To test with specific data: create tasks manually, or use the JSON import feature.
+- To test AI features: configure a Gemini API key in Settings → paste key.
+- To reset to clean state: Settings → Reset Workspace (or clear `spatialtasks-workspace` from localStorage).
+
+### Browser Coverage
+
+| Browser | Priority | Notes |
+|---------|----------|-------|
+| Chrome (desktop, latest) | P0 | Primary target — full test |
+| Safari (desktop, latest) | P1 | CSS differences, safe-area behavior |
+| Firefox (desktop, latest) | P1 | Potential flexbox/grid differences |
+| Safari iOS (iPhone) | P0 | Primary mobile target — touch, safe-area, FAB |
+| Chrome Android | P1 | Touch interactions, viewport behavior |
+| Samsung Internet | P2 | Second-most-common Android browser |
+
+### Mobile Testing
+
+- **Physical device preferred** over emulators for touch gesture testing
+- For iOS safe-area testing, use an iPhone with a notch (iPhone X or later)
+- Chrome DevTools device mode works for layout but NOT for: real touch events, vibration, safe-area insets, iOS Safari quirks
+- Use `useDeviceDetect.ts` behavior: touch is detected via `navigator.maxTouchPoints` or `(hover: none)` media query
+
+### Backend / Database
+
+- **Supabase**: Ensure `workspaces` table exists with `user_id`, `data` (JSONB), `version` columns
+- **No migrations tool** — schema is implied from code in `workspaceSync.ts`
+- To reset a user's data: delete their row from `workspaces` table in Supabase dashboard
+- Gemini API keys are **never stored in Supabase** — only in browser localStorage under `spatialtasks-gemini-config`
+
+### Debug Tooling
+
+- **React DevTools**: Inspect component tree, Zustand store state
+- **Browser DevTools → Application → Local Storage**: Inspect `spatialtasks-workspace` and `spatialtasks-gemini-config`
+- **Network tab**: Monitor Supabase sync calls (look for `workspaces` upsert requests)
+- **Console**: Errors from ErrorBoundary, Gemini API failures, and sync issues are logged here
+- **SaveIndicator** (top bar): Visual feedback on save state — useful during manual testing
+
+---
+
+## 10. Bug Report Template
+
+```markdown
+## Bug Report
+
+**Date**: YYYY-MM-DD
+**Reporter**: [name]
+**Device/Browser**: [e.g., iPhone 14 / Safari 17, Chrome 120 / macOS]
+**App Version/Commit**: [if known]
+
+### Summary
+[One sentence describing the bug]
+
+### Steps to Reproduce
+1. [Step 1]
+2. [Step 2]
+3. [Step 3]
+
+### Expected Behavior
+[What should have happened]
+
+### Actual Behavior
+[What actually happened]
+
+### Screenshot/Recording
+[Attach if possible]
+
+### Severity
+- [ ] Critical (data loss, crash, can't use app)
+- [ ] High (major feature broken)
+- [ ] Medium (feature works but incorrectly)
+- [ ] Low (cosmetic, minor annoyance)
+
+### Context
+- Was this on first use or after extended use?
+- Did a refresh fix it?
+- Network conditions: [online / offline / slow]
+- Any console errors? [paste if available]
+```
+
+---
+
+## 11. Tester Feedback Template
+
+```markdown
+## Tester Feedback
+
+**Tester Name**: _______________
+**Date**: _______________
+**Device**: _______________
+**Time Spent**: ___ minutes
+
+### Tasks Attempted
+| Task | Completed? | Difficulty (1-5) | Notes |
+|------|-----------|-----------------|-------|
+| Create a project | | | |
+| Add tasks | | | |
+| Organize spatially | | | |
+| Connect tasks | | | |
+| Change statuses | | | |
+| Use containers | | | |
+| Navigate subgraphs | | | |
+| Delete and undo | | | |
+| Refresh and check persistence | | | |
+
+### What was confusing?
+[Free text]
+
+### What was easy or enjoyable?
+[Free text]
+
+### What's missing?
+[Free text]
+
+### Bugs encountered
+[List any bugs — use the Bug Report Template for serious ones]
+
+### Would you use this app?
+- [ ] Yes, as-is
+- [ ] Yes, with some changes
+- [ ] Maybe, needs significant work
+- [ ] No
+
+### Overall rating (1-10): ___
+
+### Additional comments
+[Free text]
+```
+
+---
+
+## 12. Recommended Next Steps
+
+### Immediate (before first user test)
+1. **Run the 30-minute smoke test** (Section 4) on desktop + mobile
+2. **Fix any P0 failures** before sharing
+3. **Set up a test account** with sample data for demos
+
+### Short-term (before wider release)
+1. **Run the full pre-release checklist** (Section 5)
+2. **Conduct 3-5 user tests** using the User Verification Plan (Section 6)
+3. **Address top confusing UX issues** discovered during user tests
+4. **Add unit tests for workspaceStore** — highest ROI automation target
+
+### Medium-term (ongoing quality)
+1. **Set up Playwright E2E** for the core task lifecycle and persistence flows
+2. **Add integration tests** for status cycling and view consistency
+3. **Create a CI pipeline** that runs tests on every PR
+4. **Add visual regression tests** for node states and mobile layout
+5. **Monitor Supabase sync** — add logging for failed saves
+
+### Key Risks to Track
+- **Data loss from persistence race conditions** — the 2s debounce window is the biggest risk
+- **Mobile gesture conflicts** — needs real-device testing, not just emulators
+- **Undo/redo reliability** — especially after batch operations and persistence sync
+- **Scale performance** — test with progressively larger workspaces as users grow
