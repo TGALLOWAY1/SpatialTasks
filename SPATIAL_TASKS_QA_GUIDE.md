@@ -668,3 +668,285 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 - [ ] Color is not the only indicator of status (icons also used)
 - [ ] Text is readable at default zoom level
 - [ ] Modals trap focus and can be closed with Escape
+
+---
+
+## 6. User Verification Plan
+
+### Who Should Test
+
+| Tester Type | Why | What They'll Reveal |
+|-------------|-----|-------------------|
+| **Non-technical friend/family** | Zero context on task management tools | Discoverability issues, confusing UX, unclear terminology |
+| **Project manager / planner** | Core target user; uses task tools daily | Missing features, workflow gaps, comparison to existing tools |
+| **Developer** | Likely early adopter; will stress-test | Edge cases, performance issues, technical bugs |
+| **Mobile-primary user** | Tests the touch experience naturally | Touch target issues, gesture conflicts, responsive bugs |
+| **Someone over 50** | Tests accessibility and clarity | Font size issues, low contrast, confusing icons |
+
+### What to Ask Testers to Do
+
+Give testers these tasks **without explaining HOW to do them**:
+
+1. "Create a project for planning a birthday party"
+2. "Add 5 tasks you'd need to do for the party"
+3. "Organize them in an order that makes sense to you"
+4. "Connect tasks that depend on each other"
+5. "Mark 2 tasks as in progress and 1 as done"
+6. "Create a group for 'Decorations' and put some tasks inside it"
+7. "Go inside the Decorations group and add subtasks"
+8. "Come back to the main view"
+9. "Switch to the list view and back"
+10. "Delete a task you don't need"
+11. "Undo that deletion"
+12. "Close the app and reopen it — is everything still there?"
+
+### What NOT to Explain in Advance
+
+- How to create tasks (double-click vs FAB)
+- What the status icons mean
+- How to connect nodes
+- What containers/subgraphs are
+- How to navigate breadcrumbs
+- What the sidebar does
+- How to use execution mode
+
+### What to Observe While They Use It
+
+**Watch for these signals:**
+
+| Signal | What It Means |
+|--------|--------------|
+| Hovering without clicking | Can't find the right interaction |
+| Clicking wrong things | Affordances are unclear |
+| Asking "how do I...?" | Feature is not discoverable |
+| Long pauses | Confused or lost |
+| Trying to right-click on mobile | Desktop muscle memory, no mobile equivalent found |
+| Accidentally deleting something | Destructive action too easy to trigger |
+| Not noticing the FAB | Mobile entry point is not prominent enough |
+| Zooming past nodes | Pan/zoom feels disorienting |
+| Can't find their way back | Navigation (breadcrumbs) is unclear |
+| Ignoring the sidebar | Sidebar is not discoverable or seems unimportant |
+
+### Questions to Ask Afterward
+
+1. "What was the first thing you tried to do?"
+2. "Was anything confusing?"
+3. "Did you lose any work at any point?"
+4. "What would you change about how [specific feature] works?"
+5. "Would you use this instead of [their current tool]? Why or why not?"
+6. "What's missing?"
+7. "Rate the experience 1-10. What would make it a 10?"
+
+### Bug vs Confusing UX vs Missing Feature
+
+| Category | Definition | Example | Action |
+|----------|-----------|---------|--------|
+| **Bug** | App does something wrong or crashes | Node disappears after drag | Fix immediately |
+| **Confusing UX** | App works but user can't figure out how | User doesn't know double-click creates a task | Improve affordances/onboarding |
+| **Missing Feature** | User expects something that doesn't exist | "Can I search for a task?" | Add to backlog, prioritize |
+
+### Lightweight Tester Script
+
+> Copy-paste this and send to a friend:
+
+```
+Hey! I'm building a task management app and would love 10 minutes of your time to try it.
+
+Here's the link: [APP URL]
+
+Please try to:
+1. Create an account
+2. Make a project called "Weekend Trip"
+3. Add 5 things you'd need to plan
+4. Try to organize them visually
+5. Mark some as in progress or done
+6. Close the tab and reopen — is your stuff still there?
+
+Don't worry about doing it "right" — I want to see where it's confusing.
+If you get stuck, just tell me what you were trying to do.
+
+After you're done, tell me:
+- What confused you?
+- What was easy?
+- Would you use this?
+- What's missing?
+
+Thanks!
+```
+
+### Observer Checklist
+
+Use this while watching someone test:
+
+```
+Tester: _______________  Date: ___________  Device: ___________
+
+FIRST IMPRESSIONS
+- [ ] What did they do first?
+- [ ] Did they understand what the app is for?
+- [ ] Did they find the empty state helpful?
+
+TASK CREATION
+- [ ] Found how to create tasks? (method: double-click / FAB / other)
+- [ ] Time to first task: ___ seconds
+- [ ] Any confusion?
+
+CANVAS INTERACTION
+- [ ] Tried dragging nodes?
+- [ ] Tried connecting nodes?
+- [ ] Used pan/zoom?
+- [ ] Got lost on the canvas?
+
+NAVIGATION
+- [ ] Found sidebar?
+- [ ] Understood breadcrumbs?
+- [ ] Tried entering a container?
+- [ ] Found their way back?
+
+MOBILE (if applicable)
+- [ ] Found the FAB?
+- [ ] Used long-press?
+- [ ] Had gesture conflicts?
+- [ ] Safe area issues?
+
+DATA
+- [ ] Lost any work?
+- [ ] Noticed the save indicator?
+
+OVERALL
+- [ ] Completed all tasks? (Y/N, which ones failed)
+- [ ] Frustration moments:
+- [ ] Delight moments:
+- [ ] Feature requests:
+- [ ] Rating (1-10): ___
+```
+
+---
+
+## 7. Highest-Risk Areas / Likely Failure Points
+
+### 1. Persistence Race Conditions
+**Risk**: Data loss when localStorage and Supabase diverge.
+
+**Files**: `src/lib/workspaceSync.ts`, `src/hooks/useWorkspaceSync.ts`
+
+**Scenarios**:
+- User closes tab during the 2-second debounce window → last changes lost (only `beforeunload` warning protects this, which browsers may skip)
+- First-time login merges localStorage to Supabase — if localStorage has stale data from a different account, it could overwrite the remote
+- `_supabaseLoaded` flag prevents saves before hydration, but if hydration fails silently, no saves happen at all
+- Rapid project switching could trigger concurrent saves with different active states
+
+**Likelihood**: Medium-High. **Impact**: Critical (data loss).
+
+### 2. Undo/Redo State Corruption
+**Risk**: Undo produces inconsistent state or interacts badly with persistence.
+
+**Files**: `src/store/workspaceStore.ts` (Zundo temporal middleware)
+
+**Scenarios**:
+- Undo after a batch operation (e.g., multi-node delete with `removeNodes`) may not restore edges that were auto-removed
+- Undone state gets auto-saved to Supabase via the debounced sync, making undo "permanent"
+- 50-state limit means early history is silently dropped — user expects more undo than available
+- Undo after `hydrateFromSupabase` could revert to pre-hydration (empty/stale) state
+
+**Likelihood**: Medium. **Impact**: High.
+
+### 3. Coordinate Transform Bugs
+**Risk**: Nodes created at wrong position, especially at extreme zoom levels.
+
+**Files**: `src/components/Canvas/CanvasArea.tsx` (screenToFlowPosition)
+
+**Scenarios**:
+- Double-click at high zoom → quick-add dialog position correct but node placed at wrong flow coordinates
+- `screenToFlowPosition` depends on ReactFlow instance state which could be stale during rapid interactions
+- Mobile viewport changes (keyboard open/close) may shift coordinate reference
+
+**Likelihood**: Medium. **Impact**: Medium (confusing but not data loss).
+
+### 4. Recursive Graph Deletion / Orphaned Data
+**Risk**: Deleting a container leaves orphaned child graphs in the store.
+
+**Files**: `src/store/workspaceStore.ts` (`removeNode`, `removeNodes`)
+
+**Scenarios**:
+- `removeNode` recursively deletes child graphs, but if a child graph references another container's children, the cascade could delete too much or too little
+- `removeNodes` batch delete may process nodes in an order that causes intermediate states with broken references
+- If the recursive deletion throws mid-execution, partial cleanup leaves orphaned graphs in `state.graphs`
+
+**Likelihood**: Medium. **Impact**: High (invisible data bloat, potential state corruption).
+
+### 5. Connect Mode Stuck State
+**Risk**: Connect mode doesn't exit, leaving node dragging permanently disabled.
+
+**Files**: `src/components/Canvas/CanvasArea.tsx` (`connectMode` state)
+
+**Scenarios**:
+- User enables connect mode, taps source, then navigates away (breadcrumb/sidebar) without completing connection
+- Error during edge creation leaves `connectMode.active = true` but no visual indicator
+- On mobile, accidental tap outside nodes during connect mode has unclear behavior
+
+**Likelihood**: Medium. **Impact**: Medium (user can't drag, very confusing).
+
+### 6. View Consistency (Graph ↔ List)
+**Risk**: State changes in one view not reflected in the other.
+
+**Files**: `src/components/ListView/ListView.tsx`, `src/components/Canvas/CanvasArea.tsx`
+
+**Scenarios**:
+- Task created in list view gets position (0,0) in graph view — may stack on top of other nodes
+- Topological sort in list view could fail with cyclic dependencies (edges A→B, B→A)
+- Rapid switching between views during a mutation could show stale data
+
+**Likelihood**: Medium. **Impact**: Medium.
+
+### 7. Mobile Gesture Conflicts
+**Risk**: Touch gestures interfere with each other.
+
+**Files**: `src/components/Canvas/CanvasArea.tsx`, `src/hooks/useDeviceDetect.ts`
+
+**Scenarios**:
+- Long-press (500ms) fires during intended scroll/pan, opening action sheet accidentally
+- Swipe-back (50px from left edge) triggers during canvas pan that starts near the left edge
+- Pinch-to-zoom on a node triggers both zoom and node interaction
+- FAB positioned over a node — tapping FAB also selects the node behind it
+
+**Likelihood**: High. **Impact**: Medium (frustrating UX).
+
+### 8. Gemini API Error Handling
+**Risk**: AI features fail ungracefully.
+
+**Files**: `src/services/gemini.ts`, `src/components/FlowGenerator/FlowGenerator.tsx`
+
+**Scenarios**:
+- Malformed JSON response from Gemini → `parse_error` toast but no retry or fallback
+- Quota exceeded → user doesn't understand they need to wait or use a different key
+- Magic expand returns empty array → container gets no children, user thinks it failed
+- Network timeout has no retry mechanism — user must manually retry
+- Long prompts or complex responses may hit Gemini token limits silently
+
+**Likelihood**: Medium. **Impact**: Medium.
+
+### 9. JSON Import Validation Gaps
+**Risk**: Malformed import data corrupts workspace.
+
+**Files**: `src/store/workspaceStore.ts` (`jsonImport`)
+
+**Scenarios**:
+- `jsonImport` validates top-level structure but may not catch invalid node references (edges pointing to non-existent nodes)
+- Importing a workspace with overlapping IDs could cause conflicts
+- Very large JSON import could freeze the UI during synchronous parsing
+
+**Likelihood**: Low. **Impact**: High (workspace corruption).
+
+### 10. Performance Degradation at Scale
+**Risk**: Large canvases become unusable.
+
+**Files**: `src/components/Canvas/CanvasArea.tsx`, `src/store/workspaceStore.ts`
+
+**Scenarios**:
+- 200+ nodes on a single graph → pan/zoom lag, MiniMap slowdown
+- Deep nesting (10+ levels) → navStack grows, breadcrumb rendering slows
+- Each store mutation triggers subscriber notifications to all components
+- Entire workspace serialized to localStorage on every persist — large workspaces slow this down
+
+**Likelihood**: Medium (depends on usage). **Impact**: High (app feels broken).
