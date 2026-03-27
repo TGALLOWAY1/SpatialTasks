@@ -61,7 +61,7 @@ No URL router — single-page app with in-memory navigation stack.
 | Component | File | Purpose |
 |-----------|------|---------|
 | ListView | `src/components/ListView/ListView.tsx` | Hierarchical list view with topological sort |
-| StepDetailPanel | `src/components/ExecutionPanel/StepDetailPanel.tsx` | Execution mode side panel |
+| StepDetailPanel | `src/components/ExecutionPanel/StepDetailPanel.tsx` | Execution mode side panel; marks container as done and advances to next task on "Complete Step & Move On" |
 
 ### AI / Generation
 | Component | File | Purpose |
