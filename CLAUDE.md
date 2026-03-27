@@ -62,6 +62,15 @@ Container nodes reference a `childGraphId` creating a recursive graph-of-graphs 
 
 Deployed on Vercel. `vercel.json` configures SPA routing (all routes → `/index.html`) and security headers. Environment variables for Supabase are set via `.env` (see `.env.example`).
 
+## QA Documentation
+
+When making changes to the codebase — bug fixes, enhancements, refactors, new features, or any behavioral changes — update the relevant QA testing documents accordingly:
+
+- **`SPATIAL_TASKS_QA_GUIDE.md`** — Update or add test cases, steps, and expected results that reflect the changed behavior.
+- **`QA_INVENTORY.md`** — Update the inventory to track new, modified, or removed testable features/areas.
+
+This includes adding new test scenarios for new functionality, revising existing test steps when behavior changes, and removing outdated test cases for deleted features.
+
 ## PR Guidelines
 
 - Always include a description/body when creating pull requests. Use the `--body` flag with `gh pr create` and include a summary of changes, motivation, and any relevant test plan.
