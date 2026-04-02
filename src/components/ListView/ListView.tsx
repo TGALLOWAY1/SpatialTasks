@@ -482,7 +482,7 @@ const ExpandedChildren: React.FC<{
                     );
                 }
 
-                const blocked = isNodeBlocked(node, childGraph, { graphs } as any);
+                const blocked = isNodeBlocked(node, childGraph, graphs);
                 return (
                     <ActionItem
                         key={node.id}
@@ -635,7 +635,7 @@ export const ListView: React.FC = () => {
                             </div>
                         );
                     }
-                    const blocked = graph ? isNodeBlocked(node, graph, { graphs } as any) : false;
+                    const blocked = graph ? isNodeBlocked(node, graph, graphs) : false;
                     return (
                         <ActionItem
                             key={node.id}

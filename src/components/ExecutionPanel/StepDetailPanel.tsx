@@ -77,7 +77,7 @@ export const StepDetailPanel: React.FC = () => {
             .filter(n => n.type === 'action')
             .map(n => ({
                 ...n,
-                blocked: isNodeBlocked(n, graph, { graphs } as any),
+                blocked: isNodeBlocked(n, graph, graphs),
             }));
     }, [activeGraphId, graphs]);
 

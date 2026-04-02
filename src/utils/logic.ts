@@ -1,22 +1,26 @@
 import { Graph, Node, Workspace } from '../types';
 
 /**
- * Checks whether a source node should be considered "done".
- * Action nodes use their persisted status; container nodes derive
- * completion from child-graph progress (all leaf children done).
+ * Whether an upstream node is "complete" for dependency purposes.
+ * Action nodes use `status === 'done'`. Containers derive completion
+ * from child-graph progress — they are complete when all leaf children are done.
  */
-function isSourceDone(sourceNode: Node, workspace: Workspace): boolean {
-    if (sourceNode.type === 'container') {
-        return getContainerProgress(sourceNode, workspace) >= 1;
+function isDependencySatisfied(sourceNode: Node, graphs?: Record<string, Graph>): boolean {
+    if (sourceNode.status === 'done') return true;
+    if (sourceNode.type === 'container' && graphs) {
+        const progress = getContainerProgress(sourceNode, { graphs } as Workspace);
+        if (progress >= 1) return true;
     }
-    return sourceNode.status === 'done';
+    return false;
 }
 
 /**
  * Checks if a node is blocked by any incoming dependencies.
- * A node is blocked if it has any incoming edges from nodes that are NOT 'done'.
+ * A node is blocked if it has any incoming edges from nodes that are not yet satisfied.
+ *
+ * @param graphs - Pass workspace `graphs` so container predecessors can be evaluated by child progress.
  */
-export function isNodeBlocked(node: Node, graph: Graph, workspace?: Workspace): boolean {
+export function isNodeBlocked(node: Node, graph: Graph, graphs?: Record<string, Graph>): boolean {
     if (!graph) return false;
 
     const incomingEdges = graph.edges.filter(e => e.target === node.id);
@@ -24,13 +28,8 @@ export function isNodeBlocked(node: Node, graph: Graph, workspace?: Workspace): 
     for (const edge of incomingEdges) {
         const sourceNode = graph.nodes.find(n => n.id === edge.source);
 
-        if (sourceNode) {
-            if (workspace) {
-                if (!isSourceDone(sourceNode, workspace)) return true;
-            } else {
-                // Fallback when workspace is not provided: use persisted status
-                if (sourceNode.status !== 'done') return true;
-            }
+        if (sourceNode && !isDependencySatisfied(sourceNode, graphs)) {
+            return true;
         }
     }
 
@@ -62,16 +61,16 @@ export function getContainerProgress(containerNode: Node, workspace: Workspace):
 /**
  * Determines if a node is "Actionable" (Next Action).
  * A node is actionable if:
- * 1. It is NOT done.
+ * 1. It is NOT done (for containers: all children done = not actionable).
  * 2. It is NOT blocked.
- * 3. (Optional) It is NOT in_progress (depending on definition, usually in_progress is also 'actionable' but 'next' implies todo)
  */
-export function isNodeActionable(node: Node, graph: Graph, workspace?: Workspace): boolean {
-    if (node.type === 'container') {
-        if (workspace && getContainerProgress(node, workspace) >= 1) return false;
+export function isNodeActionable(node: Node, graph: Graph, graphs?: Record<string, Graph>): boolean {
+    if (node.type === 'container' && graphs) {
+        const progress = getContainerProgress(node, { graphs } as Workspace);
+        if (progress >= 1) return false;
     } else {
         if (node.status === 'done') return false;
     }
-    if (isNodeBlocked(node, graph, workspace)) return false;
+    if (isNodeBlocked(node, graph, graphs)) return false;
     return true;
 }

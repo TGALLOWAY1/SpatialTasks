@@ -344,9 +344,8 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 if (!currentGraph) return;
 
                 // Find the next actionable node
-                const workspace = { graphs: allGraphs } as any;
                 const nextNode = currentGraph.nodes.find(n =>
-                    n.id !== fromNodeId && isNodeActionable(n, currentGraph, workspace)
+                    n.id !== fromNodeId && isNodeActionable(n, currentGraph, allGraphs)
                 );
 
                 if (nextNode) {
