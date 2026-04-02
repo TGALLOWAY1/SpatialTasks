@@ -192,3 +192,8 @@ No URL router — single-page app with in-memory navigation stack.
 | SaveIndicator driven by sync pipeline | `SaveIndicator.tsx`, `workspaceStore.ts`, `workspaceSync.ts`, `useWorkspaceSync.ts` | Save indicator accuracy, sync error visibility |
 | Typed canvas actions replace DOM events | `workspaceStore.ts`, `CanvasArea.tsx`, `TopBar.tsx`, `ActionNode.tsx`, `StepDetailPanel.tsx` | Delete-selected, fit-view, advance-next |
 | Code splitting / lazy loading | `App.tsx`, `vite.config.ts` | Bundle size, lazy modal loading, chunk splitting |
+| JSON import error feedback via toast | `workspaceStore.ts` | Import failure shows user-facing error toast |
+| Tailwind `touch:` variant fix (screens→plugin) | `tailwind.config.js` | All `touch:` utilities generate correctly in production CSS |
+| TypeScript deprecation warning fix | `tsconfig.json` | Build passes without TS5101 warning |
+| Magic Expand logic deduplicated | `magicExpandFlow.ts`, `ContainerNode.tsx`, `ListView.tsx` | Magic Expand from graph view and list view uses shared utility |
+| Sync retry with persistent error state | `SaveIndicator.tsx`, `workspaceSync.ts` | Sync errors persist with retry button; last-saved tooltip |

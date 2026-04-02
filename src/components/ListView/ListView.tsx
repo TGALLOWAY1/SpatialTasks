@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
-import { magicExpand, GeminiError } from '../../services/gemini';
+import { executeMagicExpand, GeminiError } from '../../utils/magicExpandFlow';
 import { useToastStore } from '../UI/Toast';
 import { ConfirmModal } from '../UI/ConfirmModal';
 
@@ -243,42 +243,17 @@ const ContainerItem: React.FC<{
     const doMagicExpand = async () => {
         setExpanding(true);
         try {
-            const result = await magicExpand(settings.geminiApiKey!, node.title, node.meta?.notes);
-
-            // Clean up old child graph tree to prevent orphans
-            if (node.childGraphId) {
-                removeGraphTree(node.childGraphId);
-            }
-
-            const currentGraph = activeGraphId ? graphs[activeGraphId] : null;
-            const projectId = currentGraph?.projectId || '';
-            const childGraphId = uuidv4();
-            const childGraph: Graph = {
-                id: childGraphId, projectId, title: node.title,
-                nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 },
-            };
-            const idMap: Record<string, string> = {};
-            result.subtasks.forEach((subtask, index) => {
-                const nodeId = uuidv4();
-                idMap[subtask.id] = nodeId;
-                childGraph.nodes.push({
-                    id: nodeId, graphId: childGraphId, type: 'action', title: subtask.title,
-                    x: index * 250, y: (index % 2 === 0) ? 0 : 50, width: 200, height: 80, status: 'todo',
-                });
+            const { subtaskCount } = await executeMagicExpand({
+                apiKey: settings.geminiApiKey!,
+                nodeTitle: node.title,
+                nodeNotes: node.meta?.notes,
+                nodeId: node.id,
+                existingChildGraphId: node.childGraphId,
+                ownerGraphId: activeGraphId || '',
+                graphs,
+                removeGraphTree, addGraph, updateNode, enterGraph,
             });
-            result.subtasks.forEach((subtask) => {
-                const targetId = idMap[subtask.id];
-                subtask.dependsOn.forEach((depSlug) => {
-                    const sourceId = idMap[depSlug];
-                    if (sourceId && targetId) {
-                        childGraph.edges.push({ id: uuidv4(), graphId: childGraphId, source: sourceId, target: targetId });
-                    }
-                });
-            });
-            addGraph(childGraph);
-            updateNode(node.id, { childGraphId }, graphId);
-            enterGraph(childGraphId, node.id, node.title);
-            addToast(`Generated ${result.subtasks.length} subtasks for "${node.title}"`, 'success');
+            addToast(`Generated ${subtaskCount} subtasks for "${node.title}"`, 'success');
         } catch (err) {
             const geminiErr = err as GeminiError;
             addToast(geminiErr.message || 'Magic Expand failed.', 'error');

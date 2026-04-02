@@ -1,6 +1,6 @@
 import React, { memo, useMemo, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps, NodeResizeControl } from 'reactflow';
-import { Node as SpatialNode, Graph, Edge } from '../../types';
+import { Node as SpatialNode, Graph } from '../../types';
 import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2, Pencil, GripVertical, StickyNote } from 'lucide-react';
 import { NotesEditor } from './NotesEditor';
 import { clsx } from 'clsx';
@@ -8,13 +8,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useToastStore } from '../UI/Toast';
 import { getContainerProgress, isNodeBlocked } from '../../utils/logic';
-import { magicExpand, GeminiError } from '../../services/gemini';
+import { executeMagicExpand, GeminiError } from '../../utils/magicExpandFlow';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
-
-const WIDTH = 200;
-const HEIGHT = 80;
-const PADDING_X = 50;
+const DEFAULT_WIDTH = 200;
 const MIN_WIDTH = 160;
 const MAX_WIDTH = 500;
 
@@ -63,7 +60,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
 
     const hasApiKey = !!settings.geminiApiKey;
     const hasExistingChildren = !!(data.childGraphId && graphs[data.childGraphId]?.nodes.length > 0);
-    const nodeWidth = data.width ?? WIDTH;
+    const nodeWidth = data.width ?? DEFAULT_WIDTH;
 
     const saveTitle = useCallback(() => {
         if (editValue.trim() && editValue.trim() !== data.title) {
@@ -111,74 +108,18 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
 
     const doMagicExpand = async () => {
         setExpanding(true);
-
         try {
-            const result = await magicExpand(
-                settings.geminiApiKey!,
-                data.title,
-                data.meta?.notes
-            );
-
-            // Clean up old child graph tree to prevent orphans
-            if (data.childGraphId) {
-                removeGraphTree(data.childGraphId);
-            }
-
-            const currentGraph = activeGraphId ? graphs[activeGraphId] : null;
-            const projectId = currentGraph?.projectId || '';
-
-            const childGraphId = uuidv4();
-            const childGraph: Graph = {
-                id: childGraphId,
-                projectId,
-                title: data.title,
-                nodes: [],
-                edges: [],
-                viewport: { x: 0, y: 0, zoom: 1 },
-            };
-
-            // Map Gemini slug IDs to real UUIDs
-            const idMap: Record<string, string> = {};
-
-            result.subtasks.forEach((subtask, index) => {
-                const nodeId = uuidv4();
-                idMap[subtask.id] = nodeId;
-
-                const node: SpatialNode = {
-                    id: nodeId,
-                    graphId: childGraphId,
-                    type: 'action',
-                    title: subtask.title,
-                    x: index * (WIDTH + PADDING_X),
-                    y: (index % 2 === 0) ? 0 : 50,
-                    width: WIDTH,
-                    height: HEIGHT,
-                    status: 'todo',
-                };
-                childGraph.nodes.push(node);
+            const { subtaskCount } = await executeMagicExpand({
+                apiKey: settings.geminiApiKey!,
+                nodeTitle: data.title,
+                nodeNotes: data.meta?.notes,
+                nodeId: data.id,
+                existingChildGraphId: data.childGraphId,
+                ownerGraphId: activeGraphId || '',
+                graphs,
+                removeGraphTree, addGraph, updateNode, enterGraph,
             });
-
-            result.subtasks.forEach((subtask) => {
-                const targetId = idMap[subtask.id];
-                subtask.dependsOn.forEach((depSlug) => {
-                    const sourceId = idMap[depSlug];
-                    if (sourceId && targetId) {
-                        const edge: Edge = {
-                            id: uuidv4(),
-                            graphId: childGraphId,
-                            source: sourceId,
-                            target: targetId,
-                        };
-                        childGraph.edges.push(edge);
-                    }
-                });
-            });
-
-            addGraph(childGraph);
-            updateNode(data.id, { childGraphId });
-            enterGraph(childGraphId, data.id, data.title);
-
-            addToast(`Generated ${result.subtasks.length} subtasks for "${data.title}"`, 'success');
+            addToast(`Generated ${subtaskCount} subtasks for "${data.title}"`, 'success');
         } catch (err) {
             const geminiErr = err as GeminiError;
             addToast(geminiErr.message || 'Magic Expand failed.', 'error');

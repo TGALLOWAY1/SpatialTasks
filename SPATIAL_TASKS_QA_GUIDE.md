@@ -491,7 +491,11 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 | QA-C018 | Markdown Import | Import a well-formed markdown plan | App loaded | 1. Open MarkdownImporter 2. Paste a markdown plan with headings and bullet points 3. Confirm import | Headings become container nodes; bullet items become task nodes nested appropriately; a new project is created | Nested lists should map to hierarchy; formatting artifacts (**, ##) should be stripped from node labels | P1 |
 | QA-C019 | Markdown Import | Import empty or malformed markdown | App loaded | 1. Open MarkdownImporter 2. Paste empty string or random non-markdown text 3. Confirm import | Graceful handling — either an error toast saying invalid input or a minimal project with a single node from the text | Should not crash or produce an empty project with zero nodes | P2 |
 | QA-C020 | JSON Import | Import valid workspace JSON | App loaded, have a previously exported JSON file | 1. Open JSON import option 2. Select a valid workspace JSON file 3. Confirm import | Workspace fully replaced with imported data — all nodes, edges, positions, and project structure match the JSON | SaveIndicator should trigger a save after import; previous workspace is gone (warn user beforehand) | P1 |
-| QA-C021 | JSON Import | Import invalid JSON file | App loaded | 1. Open JSON import 2. Select a file with invalid JSON or wrong schema 3. Confirm import | Validation fails; error toast displayed; workspace remains unchanged | Should validate schema structure, not just JSON parse; no partial import leaving workspace in broken state | P1 |
+| QA-C021 | JSON Import | Import invalid JSON file | App loaded | 1. Open JSON import 2. Select a file with invalid JSON or wrong schema 3. Confirm import | Validation fails; error toast displayed with specific error message (e.g. "Import failed: Missing projects"); workspace remains unchanged | Toast shows descriptive error from validation; no partial import leaving workspace in broken state | P1 |
+| QA-C022 | Sync Retry | Sync failure shows persistent error with retry | Logged in with Supabase, network available | 1. Make changes to trigger sync 2. Disconnect network (DevTools offline) 3. Wait for sync to attempt | SaveIndicator shows "Sync failed" with red warning icon; error persists (does not auto-hide); retry button (refresh icon) appears next to error text | Error state must not fade away like "Saved" does; tooltip shows error message | P1 |
+| QA-C023 | Sync Retry | Retry button recovers from sync failure | Sync in error state (from QA-C022) | 1. Restore network connection 2. Click the retry button (refresh icon) next to "Sync failed" | Retry icon spins during attempt; on success, indicator transitions to "Saved" with green check; error clears | Verify data actually saved to Supabase after retry succeeds | P1 |
+| QA-C024 | Sync Status | Last saved tooltip shows relative time | Logged in, recent successful sync | 1. Make changes and let sync complete 2. Hover over the "Saved" indicator | Tooltip shows "Last saved X ago" (e.g. "Last saved just now" or "Last saved 2m ago") | Time should be relative and human-readable | P2 |
+| QA-C025 | Touch Variant | touch: Tailwind utilities render on hover:none devices | Touch device or browser emulation with hover:none | 1. Open app on touch device (or enable touch emulation in DevTools) 2. Inspect button elements in sidebar, TopBar, and node actions | Touch targets have min 44px height/width; buttons show touch-specific padding and sizing | Verify actual computed styles match touch: utility values | P2 |
 
 ### Group D: Auth, Mobile & Edge Cases (21 cases)
 
@@ -944,6 +948,7 @@ OVERALL
 - `jsonImport` validates top-level structure but may not catch invalid node references (edges pointing to non-existent nodes)
 - Importing a workspace with overlapping IDs could cause conflicts
 - Very large JSON import could freeze the UI during synchronous parsing
+- **Mitigated**: Import failures now show descriptive error toasts (e.g. "Import failed: Missing projects") instead of silently logging to console
 
 **Likelihood**: Low. **Impact**: High (workspace corruption).
 

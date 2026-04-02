@@ -1,3 +1,5 @@
+import plugin from 'tailwindcss/plugin';
+
 /** @type {import('tailwindcss').Config} */
 export default {
     content: [
@@ -5,11 +7,11 @@ export default {
         "./src/**/*.{js,ts,jsx,tsx}",
     ],
     theme: {
-        extend: {
-            screens: {
-                'touch': { 'raw': '(hover: none)' },
-            },
-        },
+        extend: {},
     },
-    plugins: [],
+    plugins: [
+        plugin(function ({ addVariant }) {
+            addVariant('touch', '@media (hover: none)');
+        }),
+    ],
 }

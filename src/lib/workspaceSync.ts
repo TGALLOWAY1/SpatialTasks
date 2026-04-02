@@ -72,6 +72,8 @@ export async function saveWorkspace(
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let _pendingSave = false;
+let _lastFailedSave: { userId: string; workspace: Workspace } | null = null;
+let _retryTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function debouncedSave(
     userId: string,
@@ -80,6 +82,7 @@ export function debouncedSave(
     delayMs = 2000
 ) {
     if (saveTimer) clearTimeout(saveTimer);
+    if (_retryTimer) clearTimeout(_retryTimer);
     _pendingSave = true;
 
     saveTimer = setTimeout(async () => {
@@ -87,15 +90,41 @@ export function debouncedSave(
         try {
             await saveWorkspace(userId, workspace);
             _pendingSave = false;
+            _lastFailedSave = null;
             onSyncStatus('saved');
         } catch (err) {
             console.error('Failed to save workspace to Supabase:', err);
             _pendingSave = false;
+            _lastFailedSave = { userId, workspace };
             const message = err instanceof Error ? err.message : 'Sync failed';
             onSyncStatus('error', message);
-            // Data is safe in localStorage — will retry on next state change
         }
     }, delayMs);
+}
+
+export async function retrySave(
+    onSyncStatus: (status: 'saving' | 'saved' | 'error', error?: string | null) => void
+): Promise<boolean> {
+    if (!_lastFailedSave) return false;
+
+    const { userId, workspace } = _lastFailedSave;
+    onSyncStatus('saving');
+    try {
+        await saveWorkspace(userId, workspace);
+        _lastFailedSave = null;
+        _pendingSave = false;
+        onSyncStatus('saved');
+        return true;
+    } catch (err) {
+        console.error('Retry save failed:', err);
+        const message = err instanceof Error ? err.message : 'Sync failed';
+        onSyncStatus('error', message);
+        return false;
+    }
+}
+
+export function hasFailedSave(): boolean {
+    return _lastFailedSave !== null;
 }
 
 export function hasPendingSave(): boolean {

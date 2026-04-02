@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Workspace, Node, Graph, Edge, Project, WorkspaceSettings } from '../types';
 import { generateWorkspace } from '../utils/generator';
 import { saveGeminiConfig, loadGeminiConfig } from '../lib/workspaceSync';
+import { useToastStore } from '../components/UI/Toast';
 
 export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
 export type CanvasAction =
@@ -73,7 +74,7 @@ interface WorkspaceState extends Workspace {
     updateSettings: (settings: Partial<WorkspaceSettings>) => void;
     onNodesChange: (changes: any[]) => void; // ReactFlow hook
     onEdgesChange: (changes: any[]) => void; // ReactFlow hook
-    jsonImport: (json: string) => void;
+    jsonImport: (json: string) => { success: boolean; error?: string };
 
     // Supabase sync
     hydrateFromSupabase: (data: Workspace) => void;
@@ -562,8 +563,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     // Sanitize: strip any prototype pollution
                     const clean = JSON.parse(JSON.stringify(data));
                     set(clean);
+                    return { success: true };
                 } catch (e) {
+                    const message = e instanceof Error ? e.message : 'Unknown error';
                     console.error("Failed to import", e);
+                    useToastStore.getState().addToast(`Import failed: ${message}`, 'error');
+                    return { success: false, error: message };
                 }
             },
 
