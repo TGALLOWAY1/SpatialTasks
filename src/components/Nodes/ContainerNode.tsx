@@ -52,7 +52,9 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
     }, [data, graphs]);
 
     const isActionable = useMemo(() => {
-        const blocked = activeGraphId ? isNodeBlocked(data, graphs[activeGraphId]) : false;
+        const graphId = activeGraphId ?? data.graphId;
+        const graph = graphId ? graphs[graphId] : undefined;
+        const blocked = graph ? isNodeBlocked(data, graph, graphs) : false;
         return !blocked && progress < 1;
     }, [data, activeGraphId, graphs, progress]);
 
