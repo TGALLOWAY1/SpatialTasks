@@ -76,18 +76,23 @@ let _pendingSave = false;
 export function debouncedSave(
     userId: string,
     workspace: Workspace,
+    onSyncStatus: (status: 'saving' | 'saved' | 'error', error?: string | null) => void,
     delayMs = 2000
 ) {
     if (saveTimer) clearTimeout(saveTimer);
     _pendingSave = true;
 
     saveTimer = setTimeout(async () => {
+        onSyncStatus('saving');
         try {
             await saveWorkspace(userId, workspace);
             _pendingSave = false;
+            onSyncStatus('saved');
         } catch (err) {
             console.error('Failed to save workspace to Supabase:', err);
             _pendingSave = false;
+            const message = err instanceof Error ? err.message : 'Sync failed';
+            onSyncStatus('error', message);
             // Data is safe in localStorage — will retry on next state change
         }
     }, delayMs);

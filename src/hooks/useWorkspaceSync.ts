@@ -74,10 +74,11 @@ export function useWorkspaceSync() {
     useEffect(() => {
         if (!user) return;
 
+        const setSyncStatus = useWorkspaceStore.getState().setSyncStatus;
         const unsub = useWorkspaceStore.subscribe((state) => {
             // Skip saves until Supabase data has loaded (avoid overwriting remote with stale local)
             if (!state._supabaseLoaded) return;
-            debouncedSave(user.id, state);
+            debouncedSave(user.id, state, setSyncStatus);
         });
 
         return unsub;

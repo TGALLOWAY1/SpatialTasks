@@ -2,8 +2,8 @@ import { Graph, Node, Workspace } from '../types';
 
 /**
  * Whether an upstream node is "complete" for dependency purposes.
- * Action nodes use `status === 'done'`. Containers often omit `status`; treat them as
- * complete when rolled-up leaf progress is 100% (matches list/canvas progress UI).
+ * Action nodes use `status === 'done'`. Containers derive completion
+ * from child-graph progress — they are complete when all leaf children are done.
  */
 function isDependencySatisfied(sourceNode: Node, graphs?: Record<string, Graph>): boolean {
     if (sourceNode.status === 'done') return true;
@@ -61,12 +61,16 @@ export function getContainerProgress(containerNode: Node, workspace: Workspace):
 /**
  * Determines if a node is "Actionable" (Next Action).
  * A node is actionable if:
- * 1. It is NOT done.
+ * 1. It is NOT done (for containers: all children done = not actionable).
  * 2. It is NOT blocked.
- * 3. (Optional) It is NOT in_progress (depending on definition, usually in_progress is also 'actionable' but 'next' implies todo)
  */
 export function isNodeActionable(node: Node, graph: Graph, graphs?: Record<string, Graph>): boolean {
-    if (node.status === 'done') return false;
+    if (node.type === 'container' && graphs) {
+        const progress = getContainerProgress(node, { graphs } as Workspace);
+        if (progress >= 1) return false;
+    } else {
+        if (node.status === 'done') return false;
+    }
     if (isNodeBlocked(node, graph, graphs)) return false;
     return true;
 }

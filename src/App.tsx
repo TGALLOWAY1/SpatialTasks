@@ -1,14 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { Sidebar } from './components/Layout/Sidebar';
 import { TopBar } from './components/Layout/TopBar';
 import { CanvasArea } from './components/Canvas/CanvasArea';
 import { ListView } from './components/ListView/ListView';
 import { ToastContainer } from './components/UI/Toast';
 import { LoadingScreen } from './components/UI/LoadingScreen';
-import { FlowGenerator } from './components/FlowGenerator/FlowGenerator';
-import { MarkdownImporter } from './components/FlowGenerator/MarkdownImporter';
 import { useWorkspaceStore } from './store/workspaceStore';
 import { useWorkspaceSync } from './hooks/useWorkspaceSync';
+
+const FlowGenerator = lazy(() =>
+    import('./components/FlowGenerator/FlowGenerator').then(m => ({ default: m.FlowGenerator }))
+);
+const MarkdownImporter = lazy(() =>
+    import('./components/FlowGenerator/MarkdownImporter').then(m => ({ default: m.MarkdownImporter }))
+);
 
 function App() {
     useWorkspaceSync();
@@ -39,8 +44,10 @@ function App() {
                 {viewMode === 'list' ? <ListView /> : <CanvasArea onGenerateFlow={() => setShowFlowGenerator(true)} />}
             </div>
             <ToastContainer />
-            <FlowGenerator open={showFlowGenerator} onClose={() => setShowFlowGenerator(false)} />
-            <MarkdownImporter open={showMarkdownImporter} onClose={() => setShowMarkdownImporter(false)} />
+            <Suspense fallback={null}>
+                {showFlowGenerator && <FlowGenerator open={showFlowGenerator} onClose={() => setShowFlowGenerator(false)} />}
+                {showMarkdownImporter && <MarkdownImporter open={showMarkdownImporter} onClose={() => setShowMarkdownImporter(false)} />}
+            </Suspense>
         </div>
     );
 }

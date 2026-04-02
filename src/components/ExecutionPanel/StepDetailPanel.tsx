@@ -40,8 +40,8 @@ export const StepDetailPanel: React.FC = () => {
     const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
     const cycleNodeStatus = useWorkspaceStore(state => state.cycleNodeStatus);
     const batchUpdateNodes = useWorkspaceStore(state => state.batchUpdateNodes);
-    const updateNode = useWorkspaceStore(state => state.updateNode);
     const navigateBack = useWorkspaceStore(state => state.navigateBack);
+    const dispatchCanvasAction = useWorkspaceStore(state => state.dispatchCanvasAction);
 
     const [collapsed, setCollapsed] = useState(false);
     const [showDescription, setShowDescription] = useState(true);
@@ -118,20 +118,17 @@ export const StepDetailPanel: React.FC = () => {
         // Navigate back to parent (activeGraphId becomes parent graph)
         navigateBack(1);
 
-        // Mark the container node as done in the parent graph
-        if (containerNodeId) {
-            updateNode(containerNodeId, { status: 'done' });
-        }
+        // Container completion is derived from child progress — no explicit
+        // status write needed. All children are now 'done', so
+        // getContainerProgress() will return 1.
 
-        // Dispatch advance event after a short delay to let state propagate
+        // Trigger canvas to advance to next actionable node after a short delay
         setTimeout(() => {
-            document.dispatchEvent(
-                new CustomEvent('canvas:advance-next', {
-                    detail: { fromNodeId: containerNodeId },
-                })
-            );
+            if (containerNodeId) {
+                dispatchCanvasAction({ type: 'advance-next', fromNodeId: containerNodeId });
+            }
         }, 150);
-    }, [activeGraphId, graphs, batchUpdateNodes, updateNode, navigateBack, navStack]);
+    }, [activeGraphId, graphs, batchUpdateNodes, navigateBack, navStack, dispatchCanvasAction]);
 
     // Don't show unless in execution mode and inside a container
     if (!executionMode || navStack.length < 2) return null;
