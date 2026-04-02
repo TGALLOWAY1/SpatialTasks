@@ -33,11 +33,12 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
     const [showNotes, setShowNotes] = useState(false);
 
     const { isBlocked, isActionable } = useMemo(() => {
-        if (!activeGraphId) return { isBlocked: false, isActionable: false };
-        const graph = graphs[activeGraphId];
+        const graphId = activeGraphId ?? data.graphId;
+        const graph = graphId ? graphs[graphId] : undefined;
+        if (!graph) return { isBlocked: false, isActionable: false };
         return {
-            isBlocked: isNodeBlocked(data, graph),
-            isActionable: isNodeActionable(data, graph)
+            isBlocked: isNodeBlocked(data, graph, graphs),
+            isActionable: isNodeActionable(data, graph, graphs),
         };
     }, [data, activeGraphId, graphs]);
 
