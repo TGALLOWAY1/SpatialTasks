@@ -21,6 +21,7 @@ export const TopBar: React.FC = () => {
     const toggleSidebar = useWorkspaceStore(state => state.toggleSidebar);
     const viewMode = useWorkspaceStore(state => state.viewMode);
     const setViewMode = useWorkspaceStore(state => state.setViewMode);
+    const dispatchCanvasAction = useWorkspaceStore(state => state.dispatchCanvasAction);
 
     const { undo, redo, pastStates, futureStates } = useStore(useWorkspaceStore.temporal);
 
@@ -191,7 +192,7 @@ export const TopBar: React.FC = () => {
                                     </>
                                 )}
                                 <button
-                                    onClick={() => { document.dispatchEvent(new CustomEvent('canvas:fit-view')); setOverflowOpen(false); }}
+                                    onClick={() => { dispatchCanvasAction({ type: 'fit-view' }); setOverflowOpen(false); }}
                                     className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left text-gray-300 hover:bg-gray-700 transition-colors"
                                 >
                                     <Maximize2 className="w-4 h-4 flex-shrink-0" />
@@ -220,7 +221,7 @@ export const TopBar: React.FC = () => {
                                 <div className="border-t border-gray-700 my-1" />
 
                                 <button
-                                    onClick={() => { document.dispatchEvent(new CustomEvent('canvas:delete-selected')); setOverflowOpen(false); }}
+                                    onClick={() => { dispatchCanvasAction({ type: 'delete-selected' }); setOverflowOpen(false); }}
                                     disabled={!hasSelection}
                                     className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left disabled:opacity-30 disabled:cursor-not-allowed text-red-400 hover:bg-gray-700 transition-colors"
                                 >

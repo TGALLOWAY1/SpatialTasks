@@ -1202,3 +1202,52 @@ npm run dev
 - **Mobile gesture conflicts** — needs real-device testing, not just emulators
 - **Undo/redo reliability** — especially after batch operations and persistence sync
 - **Scale performance** — test with progressively larger workspaces as users grow
+
+---
+
+## Audit Issue Fixes — Verification Tests
+
+The following test cases verify fixes from the codebase audit (`SPATIAL_TASKS_CODEBASE_AUDIT.md`).
+
+### Fix 1: Container Completion is Derived (Not Persisted)
+
+**What changed:** Container node completion is now purely derived from child progress via `getContainerProgress()`. The explicit `status: 'done'` write was removed from `StepDetailPanel.handleCompleteAndMoveOn()`. `isNodeBlocked()` now checks derived progress for container source nodes.
+
+| # | Test Case | Steps | Expected Result |
+|---|-----------|-------|-----------------|
+| AF-1 | Container shows complete when all children done | 1. Create container with 3 action children 2. Mark all 3 as done | Container progress ring shows 100%; downstream nodes unblocked |
+| AF-2 | Reopening child re-blocks downstream | 1. Complete all children of a container 2. Set one child back to 'todo' | Container progress drops; downstream nodes that depended on the container are re-blocked |
+| AF-3 | Execution mode complete-and-move-on | 1. Enter execution mode, drill into container 2. Click "Complete Step & Move On" | All children marked done, navigates back, container shows 100%, canvas advances to next node |
+| AF-4 | Container blocking is derived | 1. Create A (container) → B (action) edge 2. Leave A's children incomplete | B shows as blocked; completing all of A's children unblocks B |
+
+### Fix 2: SaveIndicator Driven by Sync Pipeline
+
+**What changed:** SaveIndicator now subscribes to `syncStatus` from the store instead of all store mutations. Sync status is set by `debouncedSave()` — only real Supabase save events trigger the indicator.
+
+| # | Test Case | Steps | Expected Result |
+|---|-----------|-------|-----------------|
+| AF-5 | UI-only actions don't trigger save indicator | 1. Toggle sidebar 2. Select/deselect nodes 3. Switch view mode | No "Saving..." indicator appears |
+| AF-6 | Data changes trigger save indicator | 1. Edit a node title 2. Add a new node | "Saving..." then "Saved" appears (when Supabase is configured) |
+| AF-7 | Sync failure shows error state | 1. Simulate network failure during save | SaveIndicator shows "Sync failed" in red; persists until next successful save |
+
+### Fix 3: Typed Canvas Actions Replace DOM Events
+
+**What changed:** `canvas:delete-selected`, `canvas:fit-view`, and `canvas:advance-next` DOM events replaced with typed store actions (`dispatchCanvasAction`/`clearCanvasAction`).
+
+| # | Test Case | Steps | Expected Result |
+|---|-----------|-------|-----------------|
+| AF-8 | TopBar delete-selected still works | 1. Select nodes on canvas 2. Click "Delete Selected" in overflow menu | Selected nodes are deleted |
+| AF-9 | TopBar fit-view still works | 1. Pan away from nodes 2. Click "View Full Flow" in overflow menu | Canvas zooms to fit all nodes |
+| AF-10 | Execution advance-next still works | 1. Enter execution mode 2. Click "Next" on highlighted action node | Node marked done, canvas zooms to next actionable node |
+| AF-11 | StepDetailPanel advance still works | 1. In execution mode, drill into container 2. Click "Complete Step & Move On" | Navigates back and advances to next actionable node |
+
+### Fix 4: Code Splitting and Lazy Loading
+
+**What changed:** FlowGenerator and MarkdownImporter are lazy-loaded via `React.lazy()`. Vite config splits ReactFlow and Supabase into separate chunks.
+
+| # | Test Case | Steps | Expected Result |
+|---|-----------|-------|-----------------|
+| AF-12 | Initial load doesn't include modal chunks | 1. Open app, check Network tab | FlowGenerator and MarkdownImporter JS chunks not loaded on initial page load |
+| AF-13 | FlowGenerator loads on demand | 1. Click "Generate Flow" button | FlowGenerator chunk loads; modal opens correctly |
+| AF-14 | MarkdownImporter loads on demand | 1. Click "Import Plan" button | MarkdownImporter chunk loads; modal opens correctly |
+| AF-15 | Build produces multiple chunks | 1. Run `npm run build` | Output shows separate chunks for react-flow, supabase, and lazy-loaded modals |

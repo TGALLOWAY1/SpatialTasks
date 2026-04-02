@@ -183,3 +183,12 @@ No URL router — single-page app with in-memory navigation stack.
 | AI generation errors | gemini.ts | Parse failures, quota limits, network errors |
 | JSON import validation | jsonImport | Partial validation; malformed data could corrupt state |
 | Viewport persistence | graph.viewport | May not save/restore correctly across navigations |
+
+## Audit Fix Inventory (April 2026)
+
+| Fix | Files Changed | Testable Area |
+|-----|---------------|---------------|
+| Container completion derived, not persisted | `logic.ts`, `StepDetailPanel.tsx`, `ActionNode.tsx`, `ContainerNode.tsx`, `ListView.tsx`, `CanvasArea.tsx` | Container progress, blocking logic, execution mode completion |
+| SaveIndicator driven by sync pipeline | `SaveIndicator.tsx`, `workspaceStore.ts`, `workspaceSync.ts`, `useWorkspaceSync.ts` | Save indicator accuracy, sync error visibility |
+| Typed canvas actions replace DOM events | `workspaceStore.ts`, `CanvasArea.tsx`, `TopBar.tsx`, `ActionNode.tsx`, `StepDetailPanel.tsx` | Delete-selected, fit-view, advance-next |
+| Code splitting / lazy loading | `App.tsx`, `vite.config.ts` | Bundle size, lazy modal loading, chunk splitting |

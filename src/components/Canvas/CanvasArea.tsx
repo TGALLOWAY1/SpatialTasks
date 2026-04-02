@@ -319,33 +319,34 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [deleteSelected, handleFitView, graph, reactFlowInstance]);
 
-    // Listen for toolbar delete event (from TopBar delete button)
-    useEffect(() => {
-        const handler = () => deleteSelected();
-        document.addEventListener('canvas:delete-selected', handler);
-        return () => document.removeEventListener('canvas:delete-selected', handler);
-    }, [deleteSelected]);
+    // Process canvas actions dispatched from other components via the store
+    const pendingCanvasAction = useWorkspaceStore(state => state.pendingCanvasAction);
+    const clearCanvasAction = useWorkspaceStore(state => state.clearCanvasAction);
 
-    // Listen for fit-view event (from TopBar overflow menu)
     useEffect(() => {
-        document.addEventListener('canvas:fit-view', handleFitView);
-        return () => document.removeEventListener('canvas:fit-view', handleFitView);
-    }, [handleFitView]);
+        if (!pendingCanvasAction) return;
 
-    // Listen for advance-next event (from execution mode Next button)
-    useEffect(() => {
-        const handler = (e: Event) => {
-            const fromNodeId = (e as CustomEvent).detail?.fromNodeId;
+        const action = pendingCanvasAction;
+        clearCanvasAction();
+
+        if (action.type === 'delete-selected') {
+            deleteSelected();
+        } else if (action.type === 'fit-view') {
+            handleFitView();
+        } else if (action.type === 'advance-next') {
+            const fromNodeId = action.fromNodeId;
             if (!activeGraphId) return;
 
             // Small delay to let the status update propagate
             setTimeout(() => {
-                const currentGraph = useWorkspaceStore.getState().graphs[activeGraphId];
+                const allGraphs = useWorkspaceStore.getState().graphs;
+                const currentGraph = allGraphs[activeGraphId];
                 if (!currentGraph) return;
 
                 // Find the next actionable node
+                const workspace = { graphs: allGraphs } as any;
                 const nextNode = currentGraph.nodes.find(n =>
-                    n.id !== fromNodeId && isNodeActionable(n, currentGraph)
+                    n.id !== fromNodeId && isNodeActionable(n, currentGraph, workspace)
                 );
 
                 if (nextNode) {
@@ -371,10 +372,8 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                     reactFlowInstance.fitView({ padding: 0.2, duration: 400 });
                 }
             }, 100);
-        };
-        document.addEventListener('canvas:advance-next', handler);
-        return () => document.removeEventListener('canvas:advance-next', handler);
-    }, [activeGraphId, graphs, reactFlowInstance]);
+        }
+    }, [pendingCanvasAction, clearCanvasAction, deleteSelected, handleFitView, activeGraphId, reactFlowInstance]);
 
     // (hasSelection tracked via store's setHasSelection)
 

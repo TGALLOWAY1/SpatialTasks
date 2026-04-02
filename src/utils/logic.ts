@@ -1,35 +1,35 @@
 import { Graph, Node, Workspace } from '../types';
 
 /**
+ * Checks whether a source node should be considered "done".
+ * Action nodes use their persisted status; container nodes derive
+ * completion from child-graph progress (all leaf children done).
+ */
+function isSourceDone(sourceNode: Node, workspace: Workspace): boolean {
+    if (sourceNode.type === 'container') {
+        return getContainerProgress(sourceNode, workspace) >= 1;
+    }
+    return sourceNode.status === 'done';
+}
+
+/**
  * Checks if a node is blocked by any incoming dependencies.
  * A node is blocked if it has any incoming edges from nodes that are NOT 'done'.
  */
-export function isNodeBlocked(node: Node, graph: Graph): boolean {
+export function isNodeBlocked(node: Node, graph: Graph, workspace?: Workspace): boolean {
     if (!graph) return false;
 
     const incomingEdges = graph.edges.filter(e => e.target === node.id);
 
     for (const edge of incomingEdges) {
         const sourceNode = graph.nodes.find(n => n.id === edge.source);
-        // If source node not found (weird), ignore.
-        // If source node is NOT done, then we are blocked.
-        // Note: Container nodes don't have a simple 'status' field usually, 
-        // but we might compute it or assume 'done' means something else.
-        // For now, let's assume all nodes can check 'status' or computed status.
 
         if (sourceNode) {
-            // Check explicit status
-            if (sourceNode.status !== 'done') {
-                // If it's a container, we might need to check its computed status
-                // For MVP, let's treat container status as derived-only or stored?
-                // The requirements say: "Container nodes... status/progress is computed... 
-                // They can still be blocked... A node is blocked if any predecessor is not done."
-
-                // If the source is a container, we need to know if IT is done.
-                // For now, let's assume we rely on the stored 'status' field being kept up to date
-                // OR we need to compute it recursively. To avoid perf issues, relying on stored status is better,
-                // provided we update it correctly.
-                return true;
+            if (workspace) {
+                if (!isSourceDone(sourceNode, workspace)) return true;
+            } else {
+                // Fallback when workspace is not provided: use persisted status
+                if (sourceNode.status !== 'done') return true;
             }
         }
     }
@@ -66,8 +66,12 @@ export function getContainerProgress(containerNode: Node, workspace: Workspace):
  * 2. It is NOT blocked.
  * 3. (Optional) It is NOT in_progress (depending on definition, usually in_progress is also 'actionable' but 'next' implies todo)
  */
-export function isNodeActionable(node: Node, graph: Graph): boolean {
-    if (node.status === 'done') return false;
-    if (isNodeBlocked(node, graph)) return false;
+export function isNodeActionable(node: Node, graph: Graph, workspace?: Workspace): boolean {
+    if (node.type === 'container') {
+        if (workspace && getContainerProgress(node, workspace) >= 1) return false;
+    } else {
+        if (node.status === 'done') return false;
+    }
+    if (isNodeBlocked(node, graph, workspace)) return false;
     return true;
 }

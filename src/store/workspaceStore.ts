@@ -6,6 +6,12 @@ import { Workspace, Node, Graph, Edge, Project, WorkspaceSettings } from '../typ
 import { generateWorkspace } from '../utils/generator';
 import { saveGeminiConfig, loadGeminiConfig } from '../lib/workspaceSync';
 
+export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
+export type CanvasAction =
+    | { type: 'delete-selected' }
+    | { type: 'fit-view' }
+    | { type: 'advance-next'; fromNodeId: string };
+
 interface WorkspaceState extends Workspace {
     // Transient flags (not persisted)
     _hydrated: boolean;
@@ -15,6 +21,14 @@ interface WorkspaceState extends Workspace {
     connectMode: { active: boolean; sourceNodeId?: string };
     sidebarOpen: boolean;
     viewMode: 'graph' | 'list';
+
+    // Sync status (transient)
+    syncStatus: SyncStatus;
+    syncError: string | null;
+    lastSavedAt: number | null;
+
+    // Canvas command queue (transient)
+    pendingCanvasAction: CanvasAction | null;
 
     // Actions
     resetWorkspace: (seed?: string) => void;
@@ -31,6 +45,13 @@ interface WorkspaceState extends Workspace {
     navigateBack: (steps?: number) => void;
     navigateToBreadcrumb: (index: number) => void;
     toggleExecutionMode: () => void;
+
+    // Sync status actions
+    setSyncStatus: (status: SyncStatus, error?: string | null) => void;
+
+    // Canvas command actions
+    dispatchCanvasAction: (action: CanvasAction) => void;
+    clearCanvasAction: () => void;
 
     // Project management
     createProject: (title: string) => void;
@@ -74,6 +95,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             connectMode: { active: false },
             sidebarOpen: false,
             viewMode: 'graph' as const,
+            syncStatus: 'idle' as SyncStatus,
+            syncError: null,
+            lastSavedAt: null,
+            pendingCanvasAction: null,
 
             toggleSelectMode: () => {
                 set(state => ({ selectMode: !state.selectMode }));
@@ -117,6 +142,22 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             toggleExecutionMode: () => {
                 set(state => ({ executionMode: !state.executionMode }));
+            },
+
+            setSyncStatus: (status, error = null) => {
+                set({
+                    syncStatus: status,
+                    syncError: error,
+                    ...(status === 'saved' ? { lastSavedAt: Date.now() } : {}),
+                });
+            },
+
+            dispatchCanvasAction: (action) => {
+                set({ pendingCanvasAction: action });
+            },
+
+            clearCanvasAction: () => {
+                set({ pendingCanvasAction: null });
             },
 
             loadProject: (projectId) => {
@@ -558,7 +599,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             storage: createJSONStorage(() => localStorage),
             partialize: (state) => {
                 // Exclude transient flags and actions from localStorage
-                const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, connectMode, sidebarOpen, viewMode, ...rest } = state;
+                const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, connectMode, sidebarOpen, viewMode, syncStatus, syncError, lastSavedAt, pendingCanvasAction, ...rest } = state;
                 return rest;
             },
             onRehydrateStorage: () => {

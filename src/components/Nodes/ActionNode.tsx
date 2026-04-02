@@ -27,6 +27,7 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
     const executionMode = useWorkspaceStore(state => state.executionMode);
     const cycleNodeStatus = useWorkspaceStore(state => state.cycleNodeStatus);
     const updateNode = useWorkspaceStore(state => state.updateNode);
+    const dispatchCanvasAction = useWorkspaceStore(state => state.dispatchCanvasAction);
 
     const [editing, setEditing] = useState(false);
     const [editValue, setEditValue] = useState(data.title);
@@ -35,9 +36,10 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
     const { isBlocked, isActionable } = useMemo(() => {
         if (!activeGraphId) return { isBlocked: false, isActionable: false };
         const graph = graphs[activeGraphId];
+        const workspace = { graphs } as any;
         return {
-            isBlocked: isNodeBlocked(data, graph),
-            isActionable: isNodeActionable(data, graph)
+            isBlocked: isNodeBlocked(data, graph, workspace),
+            isActionable: isNodeActionable(data, graph, workspace)
         };
     }, [data, activeGraphId, graphs]);
 
@@ -209,8 +211,8 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                         updateNode(data.id, { status: 'done' });
                         // Haptic feedback
                         try { navigator.vibrate(10); } catch {}
-                        // Dispatch event to zoom to next actionable node
-                        document.dispatchEvent(new CustomEvent('canvas:advance-next', { detail: { fromNodeId: data.id } }));
+                        // Trigger canvas to zoom to next actionable node
+                        dispatchCanvasAction({ type: 'advance-next', fromNodeId: data.id });
                     }}
                     className="absolute -top-3 -right-2 bg-amber-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1 hover:bg-amber-400 active:scale-95 transition-transform z-20 min-h-[28px]"
                 >
