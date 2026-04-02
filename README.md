@@ -2,7 +2,10 @@
 
 A spatial, node-based task management system. Organize projects as connected nodes on a canvas, open nodes into nested subflows, and navigate through work visually.
 
-![SpatialTasks Screenshot](screenshot.png)
+<img width="1278" height="675" alt="image" src="https://github.com/user-attachments/assets/b4e87a2c-55ae-4232-a7b8-fa8d17750edf" />
+
+<img width="442" height="369" alt="image" src="https://github.com/user-attachments/assets/e222543e-8adb-4872-b452-8944cb40b8c9" />
+
 
 ## Features
 
