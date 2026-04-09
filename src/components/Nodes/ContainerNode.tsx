@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState, useCallback } from 'react';
+import React, { memo, useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, NodeResizeControl } from 'reactflow';
 import { Node as SpatialNode, Graph, Edge } from '../../types';
 import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2, Pencil, GripVertical, StickyNote } from 'lucide-react';
@@ -39,6 +39,8 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
     const removeGraphTree = useWorkspaceStore(state => state.removeGraphTree);
     const updateNode = useWorkspaceStore(state => state.updateNode);
     const updateSettings = useWorkspaceStore(state => state.updateSettings);
+    const autoEditNodeId = useWorkspaceStore(state => state.autoEditNodeId);
+    const setAutoEditNodeId = useWorkspaceStore(state => state.setAutoEditNodeId);
     const addToast = useToastStore(state => state.addToast);
 
     const [expanding, setExpanding] = useState(false);
@@ -46,6 +48,21 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
     const [editValue, setEditValue] = useState(data.title);
     const [showExpandConfirm, setShowExpandConfirm] = useState(false);
     const [showNotes, setShowNotes] = useState(false);
+
+    // Track previous selected state for click-to-edit gating
+    const wasSelectedRef = useRef(selected);
+    useEffect(() => {
+        wasSelectedRef.current = selected;
+    }, [selected]);
+
+    // Auto-enter edit mode for newly created nodes
+    useEffect(() => {
+        if (autoEditNodeId === data.id) {
+            setEditing(true);
+            setEditValue(data.title);
+            setAutoEditNodeId(null);
+        }
+    }, [autoEditNodeId, data.id, data.title, setAutoEditNodeId]);
 
     const progress = useMemo(() => {
         return getContainerProgress(data, { graphs } as any);
@@ -77,6 +94,12 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
         setEditing(true);
         setEditValue(data.title);
     }, [data.title]);
+
+    const handleTitleClick = useCallback((e: React.MouseEvent) => {
+        if (wasSelectedRef.current) {
+            startTitleEditing(e);
+        }
+    }, [startTitleEditing]);
 
     const handleResize = useCallback((_event: any, params: { width: number }) => {
         updateNode(data.id, { width: Math.round(params.width) });
@@ -249,8 +272,9 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                                 onChange={e => setEditValue(e.target.value)}
                                 onKeyDown={e => {
                                     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveTitle(); }
-                                    if (e.key === 'Escape') setEditing(false);
+                                    if (e.key === 'Escape') { e.stopPropagation(); setEditing(false); }
                                 }}
+                                onFocus={e => e.target.select()}
                                 onBlur={saveTitle}
                                 onMouseDown={e => e.stopPropagation()}
                                 onClick={e => e.stopPropagation()}
@@ -261,7 +285,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                             <span
                                 className="font-bold text-sm text-indigo-100 break-words whitespace-pre-wrap cursor-text group/title px-0.5 rounded hover:bg-indigo-900/60 transition-colors"
                                 onDoubleClick={startTitleEditing}
-                                onClick={startTitleEditing}
+                                onClick={handleTitleClick}
                                 title="Click to edit"
                             >
                                 {data.title}

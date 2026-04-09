@@ -1,4 +1,4 @@
-import { memo, useMemo, useState, useCallback } from 'react';
+import { memo, useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, NodeResizeControl } from 'reactflow';
 import { Node } from '../../types';
 import { CheckCircle2, Circle, Clock, Lock, Pencil, GripVertical, StickyNote, SkipForward } from 'lucide-react';
@@ -28,10 +28,27 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
     const cycleNodeStatus = useWorkspaceStore(state => state.cycleNodeStatus);
     const updateNode = useWorkspaceStore(state => state.updateNode);
     const dispatchCanvasAction = useWorkspaceStore(state => state.dispatchCanvasAction);
+    const autoEditNodeId = useWorkspaceStore(state => state.autoEditNodeId);
+    const setAutoEditNodeId = useWorkspaceStore(state => state.setAutoEditNodeId);
 
     const [editing, setEditing] = useState(false);
     const [editValue, setEditValue] = useState(data.title);
     const [showNotes, setShowNotes] = useState(false);
+
+    // Track previous selected state for click-to-edit gating
+    const wasSelectedRef = useRef(selected);
+    useEffect(() => {
+        wasSelectedRef.current = selected;
+    }, [selected]);
+
+    // Auto-enter edit mode for newly created nodes
+    useEffect(() => {
+        if (autoEditNodeId === data.id) {
+            setEditing(true);
+            setEditValue(data.title);
+            setAutoEditNodeId(null);
+        }
+    }, [autoEditNodeId, data.id, data.title, setAutoEditNodeId]);
 
     const { isBlocked, isActionable } = useMemo(() => {
         const graphId = activeGraphId ?? data.graphId;
@@ -67,6 +84,13 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
         setEditing(true);
         setEditValue(data.title);
     }, [data.title]);
+
+    const handleTitleClick = useCallback((e: React.MouseEvent) => {
+        // Only enter edit mode if the node was already selected before this click
+        if (wasSelectedRef.current) {
+            startEditing(e);
+        }
+    }, [startEditing]);
 
     const handleResize = useCallback((_event: any, params: { width: number }) => {
         updateNode(data.id, { width: Math.round(params.width) });
@@ -119,7 +143,7 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                     onClick={handleStatusClick}
                     className={clsx(
                         "flex-shrink-0 hover:scale-125 transition-transform touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center mt-0.5",
-                        !isBlocked && "cursor-pointer"
+                        isBlocked ? "cursor-not-allowed" : "cursor-pointer"
                     )}
                     title={isBlocked ? "Blocked" : "Click to cycle status"}
                 >
@@ -132,8 +156,9 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                         onChange={e => setEditValue(e.target.value)}
                         onKeyDown={e => {
                             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
-                            if (e.key === 'Escape') setEditing(false);
+                            if (e.key === 'Escape') { e.stopPropagation(); setEditing(false); }
                         }}
+                        onFocus={e => e.target.select()}
                         onBlur={save}
                         onMouseDown={e => e.stopPropagation()}
                         onClick={e => e.stopPropagation()}
@@ -149,7 +174,7 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                             highlight && "text-amber-100 font-bold"
                         )}
                         onDoubleClick={startEditing}
-                        onClick={startEditing}
+                        onClick={handleTitleClick}
                         title="Click to edit"
                     >
                         {data.title}
