@@ -104,7 +104,7 @@ No URL router — single-page app with in-memory navigation stack.
 | Create project | `createProject(title)` | Creates root graph, sets active |
 | Rename project | `renameProject(id, title)` | Updates timestamp |
 | Delete project | `deleteProject(id)` | Removes all graphs; blocks if last project |
-| Add node | `addNode(node)` | Adds to active graph |
+| Add node | `addNode(node)` | Adds to active graph; sets `autoEditNodeId` for keyboard/context-menu creation |
 | Update node | `updateNode(id, data)` | Partial update |
 | Remove node | `removeNode(id)` | Removes edges + child graphs recursively |
 | Batch remove | `removeNodes(ids[])` | Batch with cleanup |
@@ -134,11 +134,26 @@ No URL router — single-page app with in-memory navigation stack.
 
 | Shortcut | Action | Guard |
 |----------|--------|-------|
+| N | Create action node at viewport center (auto-edit) | Skip when typing |
+| G | Create container node at viewport center (auto-edit) | Skip when typing |
 | Ctrl/Cmd+Z | Undo | Skip when typing |
 | Ctrl/Cmd+Shift+Z | Redo | Skip when typing |
 | Ctrl/Cmd+Shift+F | Fit view | Skip when typing |
-| Backspace/Delete | Delete selected | Skip when typing |
-| Escape | Close modals / cancel | Global |
+| Ctrl/Cmd+A | Select all nodes | Skip when typing |
+| Backspace/Delete | Delete selected (confirms if multi-select or container) | Skip when typing |
+| Escape | Layered dismiss: editing → notes → menu → quick-add → connect mode → selection | Per-layer; stops after first match |
+| Arrow keys | Navigate between connected/sibling nodes | Skip when typing; single selection |
+
+## Node Editing Behavior
+
+| Interaction | Result | Notes |
+|-------------|--------|-------|
+| Click unselected node title | Selects node only | Does NOT enter edit mode |
+| Click already-selected node title | Enters edit mode | Mirrors OS file-rename pattern |
+| Double-click node title | Enters edit mode | Always works regardless of selection |
+| Enter edit mode | Text fully selected | User can immediately type replacement |
+| Escape while editing | Exits edit, reverts title | Node stays selected (layered Escape) |
+| Blocked node status click | No-op, cursor-not-allowed | Visual cursor feedback for disabled state |
 
 ## Touch / Mobile Interactions
 

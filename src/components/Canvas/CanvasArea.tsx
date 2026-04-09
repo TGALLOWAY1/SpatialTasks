@@ -54,6 +54,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     const connectMode = useWorkspaceStore(state => state.connectMode);
     const setConnectSource = useWorkspaceStore(state => state.setConnectSource);
     const clearConnectMode = useWorkspaceStore(state => state.clearConnectMode);
+    const setAutoEditNodeId = useWorkspaceStore(state => state.setAutoEditNodeId);
     const executionMode = useWorkspaceStore(state => state.executionMode);
 
     const reactFlowInstance = useReactFlow();
@@ -167,16 +168,24 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
             setHasSelection(false);
         };
 
-        if (selectedNodes.length > 0) {
+        if (selectedNodes.length > 1) {
             const hasContainers = selectedNodes.some(n => n.type === 'container');
-            if (hasContainers) {
-                setConfirmAction({
-                    title: 'Delete Nodes',
-                    message: `Delete ${selectedNodes.length} node(s)? Container nodes and their children will be removed.`,
-                    onConfirm: doDelete,
-                });
-                return;
-            }
+            setConfirmAction({
+                title: 'Delete Nodes',
+                message: hasContainers
+                    ? `Delete ${selectedNodes.length} node(s)? Container nodes and their children will be removed.`
+                    : `Delete ${selectedNodes.length} nodes?`,
+                onConfirm: doDelete,
+            });
+            return;
+        }
+        if (selectedNodes.length === 1 && selectedNodes[0].type === 'container') {
+            setConfirmAction({
+                title: 'Delete Container',
+                message: 'Delete this container and all its children?',
+                onConfirm: doDelete,
+            });
+            return;
         }
         doDelete();
     }, [reactFlowInstance, removeEdge, removeNodes, setHasSelection]);
@@ -192,9 +201,10 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         const centerX = (window.innerWidth / 2 - viewport.x) / viewport.zoom;
         const centerY = (window.innerHeight / 2 - viewport.y) / viewport.zoom;
         const isContainer = type === 'container';
+        const nodeId = uuidv4();
 
         addNode({
-            id: uuidv4(),
+            id: nodeId,
             graphId: activeGraphId,
             type,
             title: isContainer ? 'New Group' : 'New Task',
@@ -204,7 +214,8 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
             height: isContainer ? 80 : 50,
             ...(isContainer ? {} : { status: 'todo' as const }),
         });
-    }, [activeGraphId, reactFlowInstance, addNode]);
+        setAutoEditNodeId(nodeId);
+    }, [activeGraphId, reactFlowInstance, addNode, setAutoEditNodeId]);
 
     // Keyboard shortcuts: delete, undo, redo, fit-view
     useEffect(() => {
@@ -260,20 +271,25 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 }
             }
 
-            // Escape: close transient UI + cancel modes + clear selection
+            // Escape: layered contextual dismissal (one layer per press)
             if (e.key === 'Escape') {
-                setQuickAdd(null);
-                setContextMenu(null);
-                setActionSheet(null);
-                if (connectMode.active) {
-                    clearConnectMode();
-                }
-                const hadSelection = reactFlowInstance.getNodes().some(n => n.selected) || reactFlowInstance.getEdges().some(e => e.selected);
+                // Priority 1-2: editing/notes handled by component stopPropagation
+                if (isTyping) return;
+                // Priority 3: context menu / action sheet
+                if (contextMenu) { setContextMenu(null); return; }
+                if (actionSheet) { setActionSheet(null); return; }
+                // Priority 4: quick-add input
+                if (quickAdd) { setQuickAdd(null); return; }
+                // Priority 5: connect mode
+                if (connectMode.active) { clearConnectMode(); return; }
+                // Priority 6: deselect all
+                const hadSelection = reactFlowInstance.getNodes().some(n => n.selected) || reactFlowInstance.getEdges().some(ed => ed.selected);
                 if (hadSelection) {
                     reactFlowInstance.setNodes(reactFlowInstance.getNodes().map(node => ({ ...node, selected: false })));
                     reactFlowInstance.setEdges(reactFlowInstance.getEdges().map(edge => ({ ...edge, selected: false })));
                     setHasSelection(false);
                 }
+                // Priority 7: no-op
                 return;
             }
 
@@ -378,7 +394,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [deleteSelected, handleFitView, graph, reactFlowInstance, setHasSelection, createQuickNodeAtViewportCenter, connectMode.active, clearConnectMode]);
+    }, [deleteSelected, handleFitView, graph, reactFlowInstance, setHasSelection, createQuickNodeAtViewportCenter, connectMode.active, clearConnectMode, contextMenu, actionSheet, quickAdd]);
 
     // Process canvas actions dispatched from other components via the store
     const pendingCanvasAction = useWorkspaceStore(state => state.pendingCanvasAction);
@@ -711,8 +727,9 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 label: 'New Action Node',
                 icon: <Plus className="w-4 h-4" />,
                 onClick: () => {
+                    const nodeId = uuidv4();
                     addNode({
-                        id: uuidv4(),
+                        id: nodeId,
                         graphId: activeGraphId,
                         type: 'action',
                         title: 'New Task',
@@ -722,14 +739,16 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                         height: 50,
                         status: 'todo',
                     });
+                    setAutoEditNodeId(nodeId);
                 },
             },
             {
                 label: 'New Container',
                 icon: <Layers className="w-4 h-4" />,
                 onClick: () => {
+                    const nodeId = uuidv4();
                     addNode({
-                        id: uuidv4(),
+                        id: nodeId,
                         graphId: activeGraphId,
                         type: 'container',
                         title: 'New Group',
@@ -738,10 +757,11 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                         width: 200,
                         height: 80,
                     });
+                    setAutoEditNodeId(nodeId);
                 },
             },
         ];
-    }, [activeGraphId, graph, reactFlowInstance, removeEdge, removeNode, removeNodes, updateNode, batchUpdateNodes, addNode]);
+    }, [activeGraphId, graph, reactFlowInstance, removeEdge, removeNode, removeNodes, updateNode, batchUpdateNodes, addNode, setAutoEditNodeId]);
 
     const buildActionSheetItems = useCallback((): MenuItem[] => {
         if (!actionSheet) return [];

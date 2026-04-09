@@ -19,6 +19,7 @@ interface WorkspaceState extends Workspace {
     selectMode: boolean;
     _hasSelection: boolean;
     connectMode: { active: boolean; sourceNodeId?: string };
+    autoEditNodeId: string | null;
     sidebarOpen: boolean;
     viewMode: 'graph' | 'list';
 
@@ -37,6 +38,7 @@ interface WorkspaceState extends Workspace {
     toggleConnectMode: () => void;
     setConnectSource: (nodeId: string) => void;
     clearConnectMode: () => void;
+    setAutoEditNodeId: (nodeId: string | null) => void;
     toggleSidebar: () => void;
     closeSidebar: () => void;
     setViewMode: (mode: 'graph' | 'list') => void;
@@ -93,6 +95,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             selectMode: false,
             _hasSelection: false,
             connectMode: { active: false },
+            autoEditNodeId: null,
             sidebarOpen: false,
             viewMode: 'graph' as const,
             syncStatus: 'idle' as SyncStatus,
@@ -122,6 +125,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             clearConnectMode: () => {
                 set({ connectMode: { active: false } });
+            },
+
+            setAutoEditNodeId: (nodeId: string | null) => {
+                set({ autoEditNodeId: nodeId });
             },
 
             toggleSidebar: () => {
@@ -599,7 +606,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             storage: createJSONStorage(() => localStorage),
             partialize: (state) => {
                 // Exclude transient flags and actions from localStorage
-                const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, connectMode, sidebarOpen, viewMode, syncStatus, syncError, lastSavedAt, pendingCanvasAction, ...rest } = state;
+                const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, connectMode, autoEditNodeId, sidebarOpen, viewMode, syncStatus, syncError, lastSavedAt, pendingCanvasAction, ...rest } = state;
                 return rest;
             },
             onRehydrateStorage: () => {
