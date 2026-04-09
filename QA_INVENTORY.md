@@ -192,3 +192,10 @@ No URL router — single-page app with in-memory navigation stack.
 | SaveIndicator driven by sync pipeline | `SaveIndicator.tsx`, `workspaceStore.ts`, `workspaceSync.ts`, `useWorkspaceSync.ts` | Save indicator accuracy, sync error visibility |
 | Typed canvas actions replace DOM events | `workspaceStore.ts`, `CanvasArea.tsx`, `TopBar.tsx`, `ActionNode.tsx`, `StepDetailPanel.tsx` | Delete-selected, fit-view, advance-next |
 | Code splitting / lazy loading | `App.tsx`, `vite.config.ts` | Bundle size, lazy modal loading, chunk splitting |
+
+## Related Documents
+
+| Document | Purpose |
+|----------|---------|
+| `SPATIAL_TASKS_QA_GUIDE.md` | Step-by-step QA test cases and expected results |
+| `EXPECTED_UI_BEHAVIORS.md` | Comprehensive specification of expected UI behaviors across all interactions (node editing, escape key, selection, navigation, etc.) |
