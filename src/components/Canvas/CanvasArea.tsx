@@ -183,8 +183,28 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
 
     // Fit view handler (used by keyboard shortcut and toolbar)
     const handleFitView = useCallback(() => {
-        reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+        reactFlowInstance.fitView({ padding: 0.2, duration: 300, minZoom: 0.08, maxZoom: 1.5 });
     }, [reactFlowInstance]);
+
+    const createQuickNodeAtViewportCenter = useCallback((type: 'action' | 'container' = 'action') => {
+        if (!activeGraphId) return;
+        const viewport = reactFlowInstance.getViewport();
+        const centerX = (window.innerWidth / 2 - viewport.x) / viewport.zoom;
+        const centerY = (window.innerHeight / 2 - viewport.y) / viewport.zoom;
+        const isContainer = type === 'container';
+
+        addNode({
+            id: uuidv4(),
+            graphId: activeGraphId,
+            type,
+            title: isContainer ? 'New Group' : 'New Task',
+            x: centerX - 100,
+            y: centerY - (isContainer ? 40 : 25),
+            width: 200,
+            height: isContainer ? 80 : 50,
+            ...(isContainer ? {} : { status: 'todo' as const }),
+        });
+    }, [activeGraphId, reactFlowInstance, addNode]);
 
     // Keyboard shortcuts: delete, undo, redo, fit-view
     useEffect(() => {
@@ -213,6 +233,47 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 if (isTyping) return;
                 e.preventDefault();
                 handleFitView();
+                return;
+            }
+
+            // Select all nodes: Ctrl/Cmd+A
+            if (e.key.toLowerCase() === 'a' && (e.ctrlKey || e.metaKey)) {
+                if (isTyping) return;
+                e.preventDefault();
+                const updatedNodes = reactFlowInstance.getNodes().map(node => ({ ...node, selected: true }));
+                reactFlowInstance.setNodes(updatedNodes);
+                setHasSelection(updatedNodes.length > 0);
+                return;
+            }
+
+            // Quick add shortcuts
+            if (!isTyping && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                if (e.key.toLowerCase() === 'n') {
+                    e.preventDefault();
+                    createQuickNodeAtViewportCenter('action');
+                    return;
+                }
+                if (e.key.toLowerCase() === 'g') {
+                    e.preventDefault();
+                    createQuickNodeAtViewportCenter('container');
+                    return;
+                }
+            }
+
+            // Escape: close transient UI + cancel modes + clear selection
+            if (e.key === 'Escape') {
+                setQuickAdd(null);
+                setContextMenu(null);
+                setActionSheet(null);
+                if (connectMode.active) {
+                    clearConnectMode();
+                }
+                const hadSelection = reactFlowInstance.getNodes().some(n => n.selected) || reactFlowInstance.getEdges().some(e => e.selected);
+                if (hadSelection) {
+                    reactFlowInstance.setNodes(reactFlowInstance.getNodes().map(node => ({ ...node, selected: false })));
+                    reactFlowInstance.setEdges(reactFlowInstance.getEdges().map(edge => ({ ...edge, selected: false })));
+                    setHasSelection(false);
+                }
                 return;
             }
 
@@ -317,7 +378,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [deleteSelected, handleFitView, graph, reactFlowInstance]);
+    }, [deleteSelected, handleFitView, graph, reactFlowInstance, setHasSelection, createQuickNodeAtViewportCenter, connectMode.active, clearConnectMode]);
 
     // Process canvas actions dispatched from other components via the store
     const pendingCanvasAction = useWorkspaceStore(state => state.pendingCanvasAction);
@@ -736,6 +797,9 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 selectionOnDrag={isTouchDevice ? selectMode : true}
                 multiSelectionKeyCode="Shift"
                 deleteKeyCode={null}
+                minZoom={0.08}
+                maxZoom={2.5}
+                fitViewOptions={{ padding: 0.2, minZoom: 0.08, maxZoom: 1.5 }}
                 fitView
                 className="bg-gray-950"
             >
@@ -769,6 +833,11 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                                 ? 'Or long-press the canvas for more options'
                                 : 'Or right-click for more options like creating containers'}
                         </p>
+                        {!isTouchDevice && (
+                            <p className="text-gray-600 text-[11px]">
+                                Shortcuts: <kbd className="px-1 py-0.5 rounded bg-gray-800 border border-gray-700">N</kbd> task, <kbd className="px-1 py-0.5 rounded bg-gray-800 border border-gray-700">G</kbd> group, <kbd className="px-1 py-0.5 rounded bg-gray-800 border border-gray-700">Esc</kbd> clear
+                            </p>
+                        )}
                         {onGenerateFlow && (
                             <button
                                 onClick={onGenerateFlow}

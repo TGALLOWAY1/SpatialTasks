@@ -62,7 +62,7 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
         setEditing(false);
     }, [editValue, data.title, data.id, updateNode]);
 
-    const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    const startEditing = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         setEditing(true);
         setEditValue(data.title);
@@ -79,7 +79,7 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
     return (
         <div
             className={clsx(
-                "px-4 py-2 rounded-lg shadow-lg border-2 transition-[transform,opacity,border-color,box-shadow] duration-200 relative",
+                "px-4 py-2 rounded-lg shadow-lg border-2 transition-[transform,opacity,border-color,box-shadow] duration-200 relative cursor-grab active:cursor-grabbing",
                 selected ? "border-purple-500 shadow-purple-500/20" : "border-slate-700",
                 isBlocked ? "bg-slate-900 border-slate-800 opacity-80" : "bg-slate-800",
                 data.status === 'done' && "opacity-75",
@@ -143,13 +143,14 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
                 ) : (
                     <span
                         className={clsx(
-                            "font-medium text-sm text-slate-200 break-words whitespace-pre-wrap cursor-text group/title relative flex-1",
+                            "font-medium text-sm text-slate-200 break-words whitespace-pre-wrap cursor-text group/title relative flex-1 px-0.5 rounded focus-within:bg-slate-700/40 hover:bg-slate-700/30 transition-colors",
                             data.status === 'done' && "line-through text-slate-400",
                             isBlocked && "text-slate-500",
                             highlight && "text-amber-100 font-bold"
                         )}
-                        onDoubleClick={handleDoubleClick}
-                        title="Double-click to edit"
+                        onDoubleClick={startEditing}
+                        onClick={startEditing}
+                        title="Click to edit"
                     >
                         {data.title}
                         <Pencil className="w-3 h-3 text-slate-500 opacity-0 group-hover/title:opacity-100 inline-block ml-1 align-middle transition-opacity" />
