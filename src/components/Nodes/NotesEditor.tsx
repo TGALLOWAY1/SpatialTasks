@@ -10,6 +10,12 @@ interface NotesEditorProps {
     accentColor?: 'slate' | 'indigo';
 }
 
+const urlRegex = /https?:\/\/[^\s)]+/gi;
+const extractUrls = (text: string): string[] => {
+    if (!text) return [];
+    return Array.from(new Set(text.match(urlRegex) ?? []));
+};
+
 const ExpandedNotesModal = ({ value, onChange, onSave, onClose, accentColor }: {
     value: string;
     onChange: (v: string) => void;
@@ -160,6 +166,7 @@ export const NotesEditor = ({ notes, onSave, onClose, accentColor = 'slate' }: N
     }, [value]);
 
     const isIndigo = accentColor === 'indigo';
+    const detectedUrls = extractUrls(value);
 
     if (expanded) {
         return (
@@ -238,6 +245,31 @@ export const NotesEditor = ({ notes, onSave, onClose, accentColor = 'slate' }: N
                 placeholder="Add notes..."
                 rows={4}
             />
+            {detectedUrls.length > 0 && (
+                <div className={`mt-2 border rounded p-2 max-h-20 overflow-y-auto ${
+                    isIndigo ? 'border-indigo-800/80 bg-indigo-900/20' : 'border-slate-700 bg-slate-800/40'
+                }`}>
+                    <p className={`text-[10px] mb-1 ${isIndigo ? 'text-indigo-300' : 'text-slate-400'}`}>
+                        Links detected
+                    </p>
+                    <div className="space-y-1">
+                        {detectedUrls.map((url) => (
+                            <a
+                                key={url}
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                className={`block truncate text-[11px] underline ${
+                                    isIndigo ? 'text-indigo-300 hover:text-indigo-100' : 'text-sky-300 hover:text-sky-200'
+                                }`}
+                                title={url}
+                            >
+                                {url}
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            )}
             <button
                 onClick={handleSave}
                 className={`mt-2 w-full text-xs font-medium py-1.5 rounded transition-colors ${

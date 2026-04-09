@@ -72,7 +72,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
         setEditing(false);
     }, [editValue, data.title, data.id, updateNode]);
 
-    const handleTitleDoubleClick = useCallback((e: React.MouseEvent) => {
+    const startTitleEditing = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         setEditing(true);
         setEditValue(data.title);
@@ -205,7 +205,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
     return (
         <div
             className={clsx(
-                "px-4 py-3 rounded-lg shadow-xl border-2 bg-indigo-950 transition-[transform,opacity,border-color,box-shadow] duration-200 group relative",
+                "px-4 py-3 rounded-lg shadow-xl border-2 bg-indigo-950 transition-[transform,opacity,border-color,box-shadow] duration-200 group relative cursor-grab active:cursor-grabbing",
                 selected ? "border-indigo-400 shadow-indigo-500/30" : "border-indigo-800",
                 highlight && "ring-4 ring-amber-500/50 border-amber-500 shadow-amber-500/20 scale-105 z-10",
                 dim && "opacity-30 blur-[1px] grayscale",
@@ -259,9 +259,10 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                             />
                         ) : (
                             <span
-                                className="font-bold text-sm text-indigo-100 break-words whitespace-pre-wrap cursor-text group/title"
-                                onDoubleClick={handleTitleDoubleClick}
-                                title="Double-click to edit"
+                                className="font-bold text-sm text-indigo-100 break-words whitespace-pre-wrap cursor-text group/title px-0.5 rounded hover:bg-indigo-900/60 transition-colors"
+                                onDoubleClick={startTitleEditing}
+                                onClick={startTitleEditing}
+                                title="Click to edit"
                             >
                                 {data.title}
                                 <Pencil className="w-3 h-3 text-indigo-400 opacity-0 group-hover/title:opacity-100 inline-block ml-1 align-middle transition-opacity" />

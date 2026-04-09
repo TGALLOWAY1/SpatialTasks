@@ -49,6 +49,34 @@ html, body, #root {
   fill: #9ca3af;
 }
 
+/* Improve affordance clarity for nodes and edges */
+.react-flow__node {
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+.react-flow__node:hover {
+  filter: drop-shadow(0 0 8px rgba(147, 51, 234, 0.22));
+}
+
+.react-flow__edge-path {
+  transition: stroke 120ms ease, stroke-width 120ms ease;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #a78bfa !important;
+  stroke-width: 3px !important;
+}
+
+.react-flow__handle {
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.react-flow__node:hover .react-flow__handle,
+.react-flow__node.selected .react-flow__handle {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.15);
+}
+
 /* Touch: active states for visual feedback instead of hover */
 @media (hover: none) {
   button:active {
