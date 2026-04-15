@@ -1,8 +1,9 @@
 import React, { memo, useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, NodeResizeControl } from 'reactflow';
-import { Node as SpatialNode, Graph, Edge } from '../../types';
-import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2, Pencil, GripVertical, StickyNote } from 'lucide-react';
+import { ImageAttachment, Node as SpatialNode, Graph, Edge } from '../../types';
+import { Layers, ArrowRightCircle, PieChart, ArrowBigRightDash, Sparkles, Loader2, Pencil, GripVertical, StickyNote, Image as ImageIcon } from 'lucide-react';
 import { NotesEditor } from './NotesEditor';
+import { ImagesEditor } from './ImagesEditor';
 import { clsx } from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
 import { useWorkspaceStore } from '../../store/workspaceStore';
@@ -107,6 +108,22 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
 
     const handleSaveNotes = useCallback((notes: string) => {
         updateNode(data.id, { meta: { ...data.meta, notes } });
+    }, [data.id, data.meta, updateNode]);
+
+    const imagesOpen = data.meta?.imagesOpen ?? false;
+    const imagesCount = data.meta?.images?.length ?? 0;
+
+    const toggleImagesOpen = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        updateNode(data.id, { meta: { ...data.meta, imagesOpen: !imagesOpen } });
+    }, [data.id, data.meta, imagesOpen, updateNode]);
+
+    const handleSaveImages = useCallback((next: ImageAttachment[]) => {
+        updateNode(data.id, { meta: { ...data.meta, images: next } });
+    }, [data.id, data.meta, updateNode]);
+
+    const handleCloseImages = useCallback(() => {
+        updateNode(data.id, { meta: { ...data.meta, imagesOpen: false } });
     }, [data.id, data.meta, updateNode]);
 
     const handleEnter = (e: React.MouseEvent) => {
@@ -364,11 +381,40 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                 </button>
             )}
 
+            {/* Images icon — only visible when selected */}
+            {selected && (
+                <button
+                    onClick={toggleImagesOpen}
+                    className={clsx(
+                        "absolute rounded-full flex items-center justify-center shadow-md transition-colors z-20",
+                        isTouchDevice ? "w-9 h-9 -bottom-3 -left-3" : "w-6 h-6 -bottom-2 -left-2",
+                        imagesCount > 0
+                            ? "bg-blue-600 text-blue-100 hover:bg-blue-500"
+                            : "bg-indigo-700 text-indigo-300 hover:bg-indigo-600 hover:text-indigo-100"
+                    )}
+                    title={imagesCount > 0 ? `View images (${imagesCount})` : "Add images"}
+                    aria-label={imagesCount > 0 ? `View ${imagesCount} images` : "Add images"}
+                    aria-pressed={imagesOpen}
+                >
+                    <ImageIcon className={isTouchDevice ? "w-4 h-4" : "w-3 h-3"} />
+                </button>
+            )}
+
             {showNotes && (
                 <NotesEditor
                     notes={data.meta?.notes ?? ''}
                     onSave={handleSaveNotes}
                     onClose={() => setShowNotes(false)}
+                    accentColor="indigo"
+                />
+            )}
+
+            {imagesOpen && (
+                <ImagesEditor
+                    images={data.meta?.images ?? []}
+                    onChange={handleSaveImages}
+                    onClose={handleCloseImages}
+                    canEdit={!!selected}
                     accentColor="indigo"
                 />
             )}

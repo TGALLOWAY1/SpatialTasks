@@ -1,10 +1,23 @@
 export type NodeStatus = 'todo' | 'in_progress' | 'done';
 export type NodeType = 'action' | 'container';
 
+export interface ImageAttachment {
+    id: string;             // crypto.randomUUID()
+    dataUrl: string;        // base64 data URL (V1 storage strategy)
+    name?: string;          // original filename, used for display / alt text
+    mimeType?: string;      // e.g. 'image/png'
+    addedAt: number;        // Date.now() — stable ordering for V1
+    // Reserved for future use (not wired in V1):
+    // caption?: string;
+    // hidden?: boolean;
+}
+
 export interface NodeMeta {
     notes?: string;
     tags?: string[];
     verification?: string;
+    images?: ImageAttachment[];
+    imagesOpen?: boolean; // persisted open/closed state of the Visual References section
     [key: string]: any;
 }
 
