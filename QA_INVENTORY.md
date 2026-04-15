@@ -27,6 +27,7 @@ No URL router — single-page app with in-memory navigation stack.
 | Password Reset | Recovery token | `ResetPasswordScreen.tsx` |
 | Graph View (Canvas) | Default, viewMode='graph' | `CanvasArea.tsx` |
 | List View | viewMode='list'; subtask interaction via graphId-aware store methods | `ListView.tsx` + `workspaceStore.ts` |
+| Focus View | viewMode='focus'; one task at a time with image, notes, status; auto-advances on done | `FocusView.tsx` + `ParallelChooser.tsx` |
 | Execution Mode | executionMode toggle | `CanvasArea.tsx` + `StepDetailPanel.tsx` |
 
 ## Components (23 total)
@@ -63,6 +64,8 @@ No URL router — single-page app with in-memory navigation stack.
 | Component | File | Purpose |
 |-----------|------|---------|
 | ListView | `src/components/ListView/ListView.tsx` | Hierarchical list view with topological sort |
+| FocusView | `src/components/FocusView/FocusView.tsx` | Single-task view: hero image, scrollable notes, status pill that auto-advances on done; transparently drills into containers |
+| ParallelChooser | `src/components/FocusView/ParallelChooser.tsx` | Condensed list shown by FocusView when a completed task unblocks multiple parallel successors |
 | StepDetailPanel | `src/components/ExecutionPanel/StepDetailPanel.tsx` | Execution mode side panel; marks container as done and advances to next task on "Complete Step & Move On" |
 
 ### AI / Generation
@@ -196,7 +199,10 @@ No URL router — single-page app with in-memory navigation stack.
 | Debounced save data loss | workspaceSync.ts | 2s window where crash loses data |
 | Large canvas performance | ReactFlow with many nodes | No virtualization beyond ReactFlow defaults |
 | Touch gesture conflicts | Long-press vs pan vs scroll | 500ms timer may conflict with scroll intent |
-| View mode consistency | graph ↔ list | Changes in one view must reflect in other |
+| View mode consistency | graph ↔ list ↔ focus | Changes in one view must reflect in other |
+| Focus auto-advance timing | `FocusView.tsx` | 450ms delay after status hits 'done'; rapid clicks must not double-cycle |
+| Focus container drill | `logic.ts` `getActionableLeafTasks` | Walks actionable container's child graph; returns leaf tasks only |
+| Focus parallel chooser fallback | `logic.ts` `getNextFocusTasks` | Falls back to global actionable list when direct successors are still blocked |
 | Container deletion UX | ConfirmModal | Deleting container with children is destructive |
 | AI generation errors | gemini.ts | Parse failures, quota limits, network errors |
 | JSON import validation | jsonImport | Partial validation; malformed data could corrupt state |
@@ -211,6 +217,7 @@ No URL router — single-page app with in-memory navigation stack.
 | SaveIndicator driven by sync pipeline | `SaveIndicator.tsx`, `workspaceStore.ts`, `workspaceSync.ts`, `useWorkspaceSync.ts` | Save indicator accuracy, sync error visibility |
 | Typed canvas actions replace DOM events | `workspaceStore.ts`, `CanvasArea.tsx`, `TopBar.tsx`, `ActionNode.tsx`, `StepDetailPanel.tsx` | Delete-selected, fit-view, advance-next |
 | Code splitting / lazy loading | `App.tsx`, `vite.config.ts` | Bundle size, lazy modal loading, chunk splitting |
+| Focus View mode | `workspaceStore.ts`, `logic.ts`, `TopBar.tsx`, `App.tsx`, `FocusView.tsx`, `ParallelChooser.tsx` | Single-task focus mode with image/notes/status, auto-advance, parallel chooser, container drill-in, edit modal |
 
 ## Related Documents
 

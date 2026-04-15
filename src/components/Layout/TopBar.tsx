@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { ChevronRight, Home, Undo2, Redo2, Trash2, BoxSelect, Link, Menu, LayoutGrid, List, MoreVertical, Eye, Zap, Maximize2 } from 'lucide-react';
+import { ChevronRight, Home, Undo2, Redo2, Trash2, BoxSelect, Link, Menu, LayoutGrid, List, Crosshair, MoreVertical, Eye, Zap, Maximize2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useStore } from 'zustand';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
@@ -108,6 +108,18 @@ export const TopBar: React.FC = () => {
                     >
                         <List className="w-4 h-4" />
                     </button>
+                    <button
+                        onClick={() => setViewMode('focus')}
+                        className={clsx(
+                            "p-1.5 rounded transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:flex-col touch:items-center touch:justify-center",
+                            viewMode === 'focus'
+                                ? "bg-gray-700 text-white"
+                                : "text-gray-400 hover:text-white"
+                        )}
+                        title="Focus view"
+                    >
+                        <Crosshair className="w-4 h-4" />
+                    </button>
                 </div>
                 )}
 
@@ -187,6 +199,17 @@ export const TopBar: React.FC = () => {
                                             <List className="w-4 h-4 flex-shrink-0" />
                                             List View
                                             {viewMode === 'list' && <span className="ml-auto text-purple-400 text-xs">Active</span>}
+                                        </button>
+                                        <button
+                                            onClick={() => { setViewMode('focus'); setOverflowOpen(false); }}
+                                            className={clsx(
+                                                "flex items-center gap-3 w-full px-4 py-3 text-sm text-left hover:bg-gray-700 transition-colors",
+                                                viewMode === 'focus' ? "text-white" : "text-gray-300"
+                                            )}
+                                        >
+                                            <Crosshair className="w-4 h-4 flex-shrink-0" />
+                                            Focus View
+                                            {viewMode === 'focus' && <span className="ml-auto text-purple-400 text-xs">Active</span>}
                                         </button>
                                         <div className="border-t border-gray-700 my-1" />
                                     </>

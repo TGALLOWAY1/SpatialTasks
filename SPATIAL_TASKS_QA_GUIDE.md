@@ -37,7 +37,8 @@ Spatial Tasks is a **canvas-based task management application** that lets users 
 
 1. **Graph View** (default) — Interactive ReactFlow canvas with nodes, edges, pan/zoom.
 2. **List View** — Hierarchical table with topological sorting and dependency nesting.
-3. **Execution Mode** — Overlay on graph view with a step-detail panel, focusing on one task at a time.
+3. **Focus View** — Single task at a time: hero image (top), scrollable notes (bottom), and a status pill that auto-advances to the next actionable task on completion. Shows a parallel chooser when more than one successor unblocks at once.
+4. **Execution Mode** — Overlay on graph view with a step-detail panel, focusing on one task at a time.
 
 ### Data Flow
 
@@ -333,26 +334,62 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 
 ---
 
-### Flow 14: View Mode Switching (Graph ↔ List)
+### Flow 14: View Mode Switching (Graph ↔ List ↔ Focus)
 
-**What the user is doing**: Toggling between canvas and list views.
+**What the user is doing**: Toggling between canvas, list, and focus views.
 
 **Happy path**:
 1. Click list icon in TopBar → switches to ListView
-2. Changes made in list view reflect in graph view and vice versa
-3. Status changes, node additions all consistent across views
+2. Click crosshair icon in TopBar → switches to FocusView
+3. Changes made in any view reflect in the others
+4. Status changes, node additions all consistent across views
 
 **What could go wrong**:
 - Node created in list view appears at (0,0) on canvas (no position context)
 - Status change in list view doesn't update graph node color
 - List view sorting doesn't match visual graph layout
-- View toggle hidden on small screens — user can't switch back
+- View toggle hidden on small screens — user can't switch back (overflow menu must include all three)
+- Focus view loses its current task when switching away and back (transient state, expected to reset on reload but persist within session)
 
 **Why it matters**: Consistency between views prevents confusion and data issues.
 
 ---
 
-### Flow 15: Mobile Touch Interactions
+### Flow 15: Focus View — Working Through Tasks One-at-a-Time
+
+**What the user is doing**: Picking up an established plan and grinding through tasks with full image + notes context, the way they would on a phone away from the canvas.
+
+**Happy path**:
+1. From an existing project (with tasks containing images and notes), tap the Crosshair icon in TopBar → FocusView opens on the first actionable task
+2. Hero image renders in the top half (or notes fill the screen if no image)
+3. Notes scroll independently if they're long
+4. Tap status pill once → status cycles to In progress
+5. Tap status pill again → status flips to Done; after a brief check-mark animation (~450ms) the next actionable task loads automatically
+6. If the just-completed task unblocks two parallel successors, the ParallelChooser screen appears; tap one to continue
+7. Tap Edit → modal opens with editable Notes textarea + Visual References grid (upload/remove images); Save persists changes
+8. Tap Skip (→) → advance without changing status
+9. Tap Prev (←) → return to the task you just left (in case Done was a misclick)
+10. After completing every task, an "All tasks complete" celebration screen offers Back to list view / node view
+
+**Containers**: Container nodes are never shown directly in focus view — their actionable leaf children are surfaced transparently, with a small breadcrumb (e.g. "Onboarding › Setup auth") above the title.
+
+**Desktop keyboard shortcuts**: Space/Enter = cycle status, → = skip, ← = prev, Esc = exit to list view.
+
+**What could go wrong**:
+- Auto-advance fires too fast and the user can't visually confirm completion
+- Skip/Prev buttons disabled when they shouldn't be (or enabled when no targets exist)
+- ParallelChooser doesn't appear when expected (e.g. the next task is still blocked by another predecessor)
+- Image carousel pagination dots / swipe broken on multi-image tasks
+- Edit modal doesn't save changes back to the node
+- Status pill doesn't visually reflect the in_progress / done states across cycles
+- "All tasks complete" screen shown even when there are still unblocked tasks elsewhere in the project (regression in `getActionableLeafTasks`)
+- View toggle missing from mobile overflow menu
+
+**Why it matters**: Focus view is the intended on-the-go consumption surface. Notes and images are useless if buried; getting this flow smooth is what makes the app worth carrying around.
+
+---
+
+### Flow 16: Mobile Touch Interactions
 
 **What the user is doing**: Using the app on a phone or tablet.
 
@@ -489,6 +526,15 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 | QA-B032a | Execution mode | Complete container substeps and advance to next task | Execution mode active; inside a container node with substeps; sibling nodes exist after the container in parent graph | 1. Complete all substeps inside a container (or click "Complete Step & Move On"). 2. Observe navigation back to parent graph. | The container node is marked as done in the parent graph. The canvas automatically pans to the next actionable sibling node. The next node is highlighted. No grey/blank screen. | Container status correctly set to 'done'; downstream nodes become unblocked; advance-next finds correct successor | P0 |
 | QA-B033 | Performance | Pan and zoom with 100+ nodes | Graph loaded with 100+ nodes and many edges | 1. Pan the canvas. 2. Zoom in and out. 3. Toggle fit-view. | Interactions remain responsive (no visible frame drops or lag). Fit-view completes within a reasonable time. | Framerate during pan/zoom; ReactFlow virtualization working; MiniMap stays responsive | P1 |
 | QA-B034 | Performance | Deep nesting navigation speed | Graph with 5+ levels of nested ContainerNodes | 1. Navigate down through 5 levels of nesting. 2. Use breadcrumb to jump back to root. 3. Navigate down again. | Each navigation completes quickly. No noticeable delay on enter or back. Breadcrumbs remain correct at every level. | Memory leaks from repeated navigation; viewport restore speed; breadcrumb truncation at deep levels | P2 |
+| QA-B035 | Focus view | Enter Focus View shows next actionable task | Project with several action nodes; first one has both notes and images | 1. Click the Crosshair icon in TopBar to switch to Focus View. | View renders the first actionable leaf task. If it has images, hero image fills top half (~40-45vh); otherwise notes fill the screen. Title and notes are shown below. Status pill is visible at the bottom. Header shows "Task 1 of N". | Should match `getActionableLeafTasks(activeGraph, graphs)[0]`; "No image for this task" pill shown when images array empty | P0 |
+| QA-B036 | Focus view | Status pill cycles and auto-advances on done | Focus View showing a task with status='todo' | 1. Tap the status pill once. 2. Tap it again. 3. Wait. | First tap cycles to 'in_progress' (blue). Second tap cycles to 'done' and shows a green check confirmation; after ~450ms the next actionable task replaces the current one. | Rapid clicks must not skip past 'in_progress'; advance is debounced via `advancing` flag; check that status updates also reflect in graph and list views | P0 |
+| QA-B037 | Focus view | Parallel chooser appears when 2+ successors unblock | Graph where node A has two outgoing edges to B and C, both with no other dependencies | 1. Open Focus View on node A. 2. Mark A done via the status pill. 3. After auto-advance delay, observe the screen. | The ParallelChooser screen renders, listing B and C with a small thumbnail (or placeholder), title, optional notes snippet. Tapping one continues focus on that task. | Rows should be ≥64px tall (touch target); cancel button returns to A's view if user changes mind; if a successor is still blocked by another predecessor it must NOT appear | P0 |
+| QA-B038 | Focus view | Container nodes are auto-drilled, never shown | Project root contains only a container with leaf tasks inside | 1. Switch to Focus View at root level. | The view shows a leaf task from inside the container, with a small breadcrumb above the title (e.g. "Container Title"). Container itself is never the focus task. | If container has nested containers, breadcrumb chains them ("Outer › Inner"); fully completed containers are skipped; ParallelChooser also flattens containers when collecting successors | P1 |
+| QA-B039 | Focus view | Edit modal updates notes and images | Focus View on any task | 1. Tap the Edit (pencil) button. 2. In the modal, change the notes text and add an image. 3. Tap Save. | Modal closes; the focus view immediately reflects the new notes and image hero. Switching to graph or list view confirms the change persisted. | ImagesEditor inside modal supports add/remove with 5 MB cap; closing modal via X discards unsaved edits | P1 |
+| QA-B040 | Focus view | Skip and Prev navigation | Focus View with at least 3 actionable tasks remaining | 1. Tap Skip (→). 2. Tap Skip again. 3. Tap Prev (←). | Skip moves to the next actionable task without changing status; Prev returns to the immediately previous focus task (in-memory history). At the start of a session Prev is disabled. | Skip is disabled when only one actionable task remains; status of skipped tasks remains unchanged | P1 |
+| QA-B041 | Focus view | All-tasks-complete celebration screen | Project with a small, fully connected workflow | 1. From Focus View, complete every task in sequence. | After the last task is marked done, instead of another task the celebration screen appears: party-popper icon, "All tasks complete", and buttons to return to list view or node view. | Should not appear if there are still actionable tasks in unrelated branches; "Back to list view" / "Back to node view" buttons must work | P1 |
+| QA-B042 | Focus view | View toggle hidden but reachable on small screens | Mobile/small viewport (< sm breakpoint) | 1. Open the TopBar overflow menu (kebab/MoreVertical icon). | The overflow menu lists Node View, List View, AND Focus View options, each with the active state highlighted when current. | Tapping switches view mode and closes the menu; new Focus button must not be left out of mobile UX | P0 |
+| QA-B043 | Focus view | Desktop keyboard shortcuts | Focus View on desktop with one task showing | 1. Press Space. 2. Press Space again. 3. Press → key. 4. Press ← key. 5. Press Esc. | Space/Enter cycles status (and may auto-advance); → triggers Skip; ← triggers Prev; Esc switches viewMode back to 'list'. | Shortcuts must NOT fire while typing in the Edit modal's textarea; should be inert on touch devices | P2 |
 
 ### Group C: Projects, Persistence & AI (21 cases)
 
@@ -629,9 +675,10 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 - [ ] No data loss when closing tab during debounce window (verify beforeunload warning)
 
 ### Views & Modes
-- [ ] Graph ↔ List view toggle works
-- [ ] Status changes in list view reflect in graph view (and vice versa)
+- [ ] Graph ↔ List ↔ Focus view toggle works
+- [ ] Status changes in any view reflect in the others
 - [ ] Tasks created in list view appear in graph view
+- [ ] Focus View opens on the first actionable task; auto-advances on done; ParallelChooser appears for multi-successor unblocks; container leaves are surfaced transparently
 - [ ] Execution mode activates with correct panel and highlighting
 - [ ] "Next" button in execution mode navigates to correct actionable node
 - [ ] Blocked/actionable states are accurate based on dependencies

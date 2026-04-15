@@ -74,3 +74,100 @@ export function isNodeActionable(node: Node, graph: Graph, graphs?: Record<strin
     if (isNodeBlocked(node, graph, graphs)) return false;
     return true;
 }
+
+/**
+ * Reference to a leaf action task discovered via container drill-in.
+ * `breadcrumb` lists the chain of container titles leading to this task
+ * so the focus view can present "Project > Container > Subcontainer".
+ */
+export interface FocusTaskRef {
+    node: Node;
+    graphId: string;
+    breadcrumb: string[];
+}
+
+/**
+ * Walks a graph (and any actionable containers' child graphs, recursively)
+ * collecting every leaf action node that is currently actionable. Containers
+ * themselves are never returned — focus view only presents leaf tasks.
+ *
+ * Order matches a depth-first traversal of the input graph's node array so
+ * containers are explored as we encounter them.
+ */
+export function getActionableLeafTasks(
+    graph: Graph,
+    graphs: Record<string, Graph>,
+    breadcrumb: string[] = []
+): FocusTaskRef[] {
+    if (!graph) return [];
+    const results: FocusTaskRef[] = [];
+    for (const node of graph.nodes) {
+        if (node.type === 'action') {
+            if (isNodeActionable(node, graph, graphs)) {
+                results.push({ node, graphId: graph.id, breadcrumb });
+            }
+        } else if (node.type === 'container' && node.childGraphId) {
+            // Only drill into containers that are themselves actionable
+            // (i.e. not blocked by external dependencies and not fully done).
+            if (!isNodeActionable(node, graph, graphs)) continue;
+            const childGraph = graphs[node.childGraphId];
+            if (!childGraph) continue;
+            results.push(
+                ...getActionableLeafTasks(childGraph, graphs, [...breadcrumb, node.title])
+            );
+        }
+    }
+    return results;
+}
+
+/**
+ * Given a just-completed leaf node, determine the next focus task(s).
+ *
+ * Returns:
+ *  - 0 entries → nothing left actionable in the active project (show "all done")
+ *  - 1 entry   → auto-advance to that task
+ *  - 2+ entries → render the parallel chooser
+ *
+ * Strategy: collect actionable successors of the completed node (including
+ * drilling into actionable containers). If none of the direct successors are
+ * actionable (e.g. they're still blocked by *other* incomplete predecessors),
+ * fall back to the global actionable set in the root graph.
+ */
+export function getNextFocusTasks(
+    completedNodeId: string,
+    completedGraphId: string,
+    rootGraph: Graph,
+    graphs: Record<string, Graph>
+): FocusTaskRef[] {
+    const completedGraph = graphs[completedGraphId];
+    if (!completedGraph) {
+        return getActionableLeafTasks(rootGraph, graphs);
+    }
+
+    const successors = completedGraph.edges
+        .filter(e => e.source === completedNodeId)
+        .map(e => completedGraph.nodes.find(n => n.id === e.target))
+        .filter((n): n is Node => !!n);
+
+    const direct: FocusTaskRef[] = [];
+    for (const s of successors) {
+        if (s.type === 'action') {
+            if (isNodeActionable(s, completedGraph, graphs)) {
+                direct.push({ node: s, graphId: completedGraph.id, breadcrumb: [] });
+            }
+        } else if (s.type === 'container' && s.childGraphId) {
+            if (!isNodeActionable(s, completedGraph, graphs)) continue;
+            const childGraph = graphs[s.childGraphId];
+            if (!childGraph) continue;
+            direct.push(...getActionableLeafTasks(childGraph, graphs, [s.title]));
+        }
+    }
+
+    if (direct.length > 0) return direct;
+
+    // No direct successors actionable (blocked by other things, or none exist).
+    // Fall back to the next actionable task anywhere in the root graph,
+    // excluding the just-completed node.
+    return getActionableLeafTasks(rootGraph, graphs)
+        .filter(t => t.node.id !== completedNodeId);
+}

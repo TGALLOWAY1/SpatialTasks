@@ -3,6 +3,7 @@ import { Sidebar } from './components/Layout/Sidebar';
 import { TopBar } from './components/Layout/TopBar';
 import { CanvasArea } from './components/Canvas/CanvasArea';
 import { ListView } from './components/ListView/ListView';
+import { FocusView } from './components/FocusView/FocusView';
 import { ToastContainer } from './components/UI/Toast';
 import { LoadingScreen } from './components/UI/LoadingScreen';
 import { useWorkspaceStore } from './store/workspaceStore';
@@ -41,7 +42,11 @@ function App() {
             <Sidebar onGenerateFlow={() => setShowFlowGenerator(true)} onImportPlan={() => setShowMarkdownImporter(true)} />
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
                 <TopBar />
-                {viewMode === 'list' ? <ListView /> : <CanvasArea onGenerateFlow={() => setShowFlowGenerator(true)} />}
+                {viewMode === 'list'
+                    ? <ListView />
+                    : viewMode === 'focus'
+                        ? <FocusView />
+                        : <CanvasArea onGenerateFlow={() => setShowFlowGenerator(true)} />}
             </div>
             <ToastContainer />
             <Suspense fallback={null}>
