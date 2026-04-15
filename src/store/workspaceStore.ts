@@ -21,7 +21,11 @@ interface WorkspaceState extends Workspace {
     connectMode: { active: boolean; sourceNodeId?: string };
     autoEditNodeId: string | null;
     sidebarOpen: boolean;
-    viewMode: 'graph' | 'list';
+    viewMode: 'graph' | 'list' | 'focus';
+
+    // Focus view session state (transient)
+    focusNodeId: string | null;
+    focusContextGraphId: string | null;
 
     // Sync status (transient)
     syncStatus: SyncStatus;
@@ -41,7 +45,9 @@ interface WorkspaceState extends Workspace {
     setAutoEditNodeId: (nodeId: string | null) => void;
     toggleSidebar: () => void;
     closeSidebar: () => void;
-    setViewMode: (mode: 'graph' | 'list') => void;
+    setViewMode: (mode: 'graph' | 'list' | 'focus') => void;
+    setFocusTask: (nodeId: string, graphId: string) => void;
+    clearFocusTask: () => void;
     loadProject: (projectId: string) => void;
     enterGraph: (graphId: string, nodeId: string, nodeLabel: string) => void;
     navigateBack: (steps?: number) => void;
@@ -98,6 +104,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             autoEditNodeId: null,
             sidebarOpen: false,
             viewMode: 'graph' as const,
+            focusNodeId: null,
+            focusContextGraphId: null,
             syncStatus: 'idle' as SyncStatus,
             syncError: null,
             lastSavedAt: null,
@@ -141,6 +149,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             setViewMode: (mode) => {
                 set({ viewMode: mode });
+            },
+
+            setFocusTask: (nodeId, graphId) => {
+                set({ focusNodeId: nodeId, focusContextGraphId: graphId });
+            },
+
+            clearFocusTask: () => {
+                set({ focusNodeId: null, focusContextGraphId: null });
             },
 
             resetWorkspace: (seed = '42') => {
@@ -606,7 +622,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             storage: createJSONStorage(() => localStorage),
             partialize: (state) => {
                 // Exclude transient flags and actions from localStorage
-                const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, connectMode, autoEditNodeId, sidebarOpen, viewMode, syncStatus, syncError, lastSavedAt, pendingCanvasAction, ...rest } = state;
+                const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, connectMode, autoEditNodeId, sidebarOpen, viewMode, focusNodeId, focusContextGraphId, syncStatus, syncError, lastSavedAt, pendingCanvasAction, ...rest } = state;
                 return rest;
             },
             onRehydrateStorage: () => {
