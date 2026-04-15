@@ -35,9 +35,11 @@ No URL router — single-page app with in-memory navigation stack.
 | Component | File | Purpose |
 |-----------|------|---------|
 | CanvasArea | `src/components/Canvas/CanvasArea.tsx` | ReactFlow canvas, pan/zoom, shortcuts, touch gestures |
-| ActionNode | `src/components/Nodes/ActionNode.tsx` | Task node: status cycle, inline edit, resize, notes |
-| ContainerNode | `src/components/Nodes/ContainerNode.tsx` | Folder node: progress ring, magic expand, enter subgraph |
+| ActionNode | `src/components/Nodes/ActionNode.tsx` | Task node: status cycle, inline edit, resize, notes, images |
+| ContainerNode | `src/components/Nodes/ContainerNode.tsx` | Folder node: progress ring, magic expand, enter subgraph, images |
 | NotesEditor | `src/components/Nodes/NotesEditor.tsx` | Notes popover/modal for nodes |
+| ImagesEditor | `src/components/Nodes/ImagesEditor.tsx` | Visual References panel: inline thumbnail grid, upload, remove, with persisted open/closed state |
+| ImageLightbox | `src/components/Nodes/ImageLightbox.tsx` | Fullscreen image viewer with keyboard/arrow navigation |
 
 ### Layout
 | Component | File | Purpose |
@@ -93,7 +95,8 @@ No URL router — single-page app with in-memory navigation stack.
 | Workspace | version, projects[], graphs{}, navStack[], settings | Root data object |
 | Project | id, title, rootGraphId, createdAt, updatedAt | Top-level container |
 | Graph | id, projectId, title, nodes[], edges[], viewport? | Canvas content |
-| Node | id, graphId, type, title, x, y, status?, childGraphId?, meta? | action or container |
+| Node | id, graphId, type, title, x, y, status?, childGraphId?, meta? | action or container; `meta.images[]` holds image attachments, `meta.imagesOpen` persists the Visual References toggle |
+| ImageAttachment | id, dataUrl, name?, mimeType?, addedAt | Base64-encoded image stored under `node.meta.images[]` (V1) |
 | Edge | id, graphId, source, target | Directed connection |
 | Viewport | x, y, zoom | Camera position per graph |
 
@@ -198,6 +201,7 @@ No URL router — single-page app with in-memory navigation stack.
 | AI generation errors | gemini.ts | Parse failures, quota limits, network errors |
 | JSON import validation | jsonImport | Partial validation; malformed data could corrupt state |
 | Viewport persistence | graph.viewport | May not save/restore correctly across navigations |
+| Image base64 bloat in Supabase JSONB | `workspaceSync.ts`, `ImagesEditor.tsx` | Attachments are stored inline in the workspace blob; many/large images inflate sync payload and localStorage. V1 enforces 5 MB/image; move to Supabase Storage in V2. |
 
 ## Audit Fix Inventory (April 2026)
 
