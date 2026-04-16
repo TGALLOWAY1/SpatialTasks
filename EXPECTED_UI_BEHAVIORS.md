@@ -209,9 +209,21 @@ All shortcuts should only fire when the canvas has focus (not when typing in an 
 
 - **Click the status icon** (left side of an action node) → cycles through: Todo → In Progress → Done → Todo.
 - The status icon should update immediately with appropriate visual feedback (icon change, color change).
-- **Blocked nodes** (those with unsatisfied dependencies) should show a lock icon and should NOT allow status changes. The cursor should indicate the interaction is disabled.
+- **Blocked nodes** (those with unsatisfied dependencies) show a lock icon in place of the status circle. Clicking the lock does NOT cycle status — it surfaces the blockers (see §11a).
 - Cycling status should be a single-click action — no menus or extra steps.
 - Status can also be set via right-click context menu → Set Status submenu, which allows jumping directly to any status.
+
+## 11a. Blocked Node Interaction ("Why is this blocked?")
+
+- Every node with unsatisfied predecessors shows a red **"Blocked"** badge on its top-right corner in addition to the lock on the status icon.
+- **Clicking the lock icon OR the "Blocked" badge** on a blocked node opens the **predecessor trace**:
+  - Each blocking predecessor gets a red pulse ring (2 cycles, ~2.4s) overlayed on its node.
+  - The viewport auto-fits to include the blocked node and its blockers (400ms animation).
+  - A chip bar anchored under the blocked node lists each blocker: `Blocked by <Title>`. Container blockers show progress: `<Title> (42%)`.
+  - On small/touch screens, the chip bar is replaced by a bottom sheet with 44×44 tap targets.
+- **Clicking a blocker chip/row** dismisses the spotlight and frames the blocker on screen (and selects it when possible).
+- **Dismissal**: Esc, clicking empty canvas, the × button on the chip bar, or after a 4-second timeout.
+- Blocker resolution is refreshed on each open — stale blockers won't be shown.
 
 ---
 
