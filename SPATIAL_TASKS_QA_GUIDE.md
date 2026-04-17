@@ -412,6 +412,34 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 
 ---
 
+### Flow 17: Auto-Organize Canvas
+
+**What the user is doing**: Cleaning up a messy board with the Auto-Organize feature.
+
+**Happy path**:
+1. User opens a graph whose nodes overlap or are scattered.
+2. Clicks the ✨ wand button in the top bar → popover lists four strategies (Cluster / Grid / Hierarchy / Flow) with short descriptions.
+3. Picks **Cluster** (default). Nodes animate (~450ms ease-out) into grouped clusters: connected components sit together, same-color/tag nodes adjacent inside each cluster.
+4. Presses **Ctrl+Z** once → exact prior positions restored (single undo step).
+5. Right-clicks the canvas pane → "Auto-Organize ▸" submenu offers the same four strategies.
+6. Selects a subset of nodes, opens the wand popover, ticks "Apply to selection only" → only the selected nodes move; the rest stay put.
+7. On touch: opens the TopBar overflow menu → "Auto-Organize" section lists the four strategies as buttons.
+8. Re-opening the popover highlights the last-used strategy as "Last used" (persisted in `settings.preferredLayoutStrategy`).
+
+**What could go wrong**:
+- Animation janks on graphs with many nodes (>200) or during concurrent drag.
+- Layout produces residual overlaps (the sweep-line resolver should catch these).
+- Strategy falls back silently on cyclic edges (Hierarchy/Flow → Grid) — make sure result is still laid out cleanly.
+- Selection-only run moves unselected nodes (bug in sentinel handling).
+- Undo fails to restore exact pre-organize positions (batchUpdatePositions commit order issue).
+- Cluster layout with no edges doesn't group by color/tag.
+- Popover stays open after applying a layout, or doesn't close on outside click.
+- Preferred strategy not persisted after reload.
+
+**Why it matters**: Core "spatial thinking" product promise — the canvas has to feel organized without destroying the user's mental map. Undo has to be bulletproof since users will experiment.
+
+---
+
 ## 3. Manual QA Test Plan
 
 > 90 test cases organized by feature area. Priority levels: P0 (Critical), P1 (High), P2 (Medium).
@@ -478,6 +506,18 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 | QA-A037 | Escape Key | Layered Escape dismisses context menu first | Context menu is open while nodes are selected | 1. Select a node 2. Right-click to open context menu 3. Press Escape | Context menu closes; node selection remains | A second Escape press should then deselect the node | P1 |
 | QA-A038 | Escape Key | Layered Escape dismisses connect mode | Connect mode is active with nodes selected | 1. Select a node 2. Activate connect mode 3. Press Escape | Connect mode exits; node selection remains | A second Escape press should then deselect the node | P1 |
 | QA-A039 | Status | Blocked node shows not-allowed cursor | An ActionNode is blocked by unsatisfied dependencies | 1. Hover over the status icon of a blocked node | Cursor changes to not-allowed; clicking does not cycle status | Cursor should clearly indicate the interaction is disabled | P1 |
+| QA-A040 | Auto-Organize | Cluster layout from toolbar | A graph with 5+ nodes and at least 2 edges | 1. Drag nodes to overlap / scatter 2. Click the ✨ wand button in the top bar 3. Select "Cluster" | Nodes animate smoothly (~450ms) into grouped clusters; connected components sit together; no overlaps | Animation should not jank; final positions must have no AABB overlaps; popover closes after selection | P0 |
+| QA-A041 | Auto-Organize | Grid layout produces aligned rows/columns | A graph with 6+ nodes | 1. Open ✨ Auto-Organize 2. Select "Grid" | Nodes animate into clean rows/columns with consistent spacing | Columns must be aligned; rows left-justified; no overlaps | P1 |
+| QA-A042 | Auto-Organize | Hierarchy layout respects dependencies | A graph with a chain/tree of connected nodes | 1. Create a dependency chain A→B→C→D 2. Open ✨ Auto-Organize 3. Select "Hierarchy" | Nodes lay out top-to-bottom in dependency order: roots at top, leaves at bottom | Source nodes (no incoming edges) must be in the top layer; order within a layer should reduce edge crossings | P1 |
+| QA-A043 | Auto-Organize | Flow layout is left-to-right | A graph with a dependency chain | 1. Open ✨ Auto-Organize 2. Select "Flow" | Nodes lay out left-to-right along dependencies; same-depth siblings stack vertically | Left column = sources; right column = sinks | P1 |
+| QA-A044 | Auto-Organize | Undo restores exact prior positions | Any graph after running Auto-Organize | 1. Note positions of 2-3 nodes 2. Run any strategy 3. Press Ctrl+Z | All nodes return to their exact pre-organize positions | Must be a single undo step (not per-node); use zundo via batchUpdatePositions commit | P0 |
+| QA-A045 | Auto-Organize | Cyclic edges fall back to Grid for Hierarchy/Flow | A graph with a cycle (A→B→C→A) | 1. Open ✨ Auto-Organize 2. Select "Hierarchy" (or "Flow") | Layout engine detects cycle and falls back to Grid; no crash, no infinite recursion | Cycle detection must not throw; all nodes still laid out cleanly | P1 |
+| QA-A046 | Auto-Organize | Selection-only scope | A graph with 6+ nodes | 1. Select 3 nodes 2. Open ✨ Auto-Organize 3. Check "Apply to selection only" 4. Select "Grid" | Only the 3 selected nodes are repositioned; unselected nodes remain in place | Empty-array `nodeIds` sentinel in action resolves to current RF selection | P1 |
+| QA-A047 | Auto-Organize | Context menu submenu | A graph with 2+ nodes | 1. Right-click on an empty area of the canvas 2. Hover "Auto-Organize ▸" | Submenu shows 4 strategies (Cluster / Grid / Hierarchy / Flow); selecting one triggers the same animated layout | Submenu positioning stays within viewport | P1 |
+| QA-A048 | Auto-Organize | Preferred strategy persists across reload | Last used strategy was "Grid" | 1. Run Auto-Organize → Grid 2. Reload the page 3. Open ✨ Auto-Organize | "Grid" shows the "Last used" pill in the popover | Persisted via `settings.preferredLayoutStrategy` through localStorage + Supabase sync | P2 |
+| QA-A049 | Auto-Organize | Mobile overflow menu entries | Touch device | 1. Open the top-bar overflow menu (⋮) 2. Scroll to "Auto-Organize" section | Four strategy buttons listed (Cluster / Grid / Hierarchy / Flow); tapping any one runs the layout and closes the menu | All buttons meet 44px min touch target | P2 |
+| QA-A050 | Auto-Organize | Deterministic re-run | A graph with 10+ nodes | 1. Run Auto-Organize → Cluster 2. Undo 3. Run Auto-Organize → Cluster again | Second run produces identical positions to the first | `computeLayout` must be pure; seeded RNG and stable sort required | P2 |
+| QA-A051 | Auto-Organize | No-op on empty or single-node graph | 0 or 1 nodes on the canvas | 1. Run any Auto-Organize strategy | No animation, no error, no state change | Must not throw or create a stray undo entry | P2 |
 
 ### Group B: Connections, Navigation & Views (34 cases)
 

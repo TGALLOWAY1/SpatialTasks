@@ -20,13 +20,15 @@ import { ContextMenu, MenuItem } from '../UI/ContextMenu';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { ActionSheet } from '../UI/ActionSheet';
 import { FloatingActionButton } from '../UI/FloatingActionButton';
-import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Sparkles, Maximize2, Palette, Ban } from 'lucide-react';
+import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Sparkles, Maximize2, Palette, Ban, Wand2, Grid3x3, Network, GitBranch } from 'lucide-react';
 import { ACCENT_COLORS, ACCENT_BAR, ACCENT_LABEL } from '../../utils/accent';
 import type { AccentColor } from '../../types';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 import { isNodeActionable, getBlockingNodes, BlockingNodeInfo } from '../../utils/logic';
 import { StepDetailPanel } from '../ExecutionPanel/StepDetailPanel';
 import { BlockedSpotlight, useBlockingTitles } from './BlockedSpotlight';
+import { computeLayout } from '../../layout/layoutEngine';
+import type { LayoutStrategy } from '../../layout/layoutTypes';
 
 const nodeTypes = {
     container: ContainerNode,
@@ -458,6 +460,60 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 duration: 300,
                 maxZoom: 1.5,
             });
+        } else if (action.type === 'auto-organize') {
+            if (!activeGraphId) return;
+            const currentGraph = useWorkspaceStore.getState().graphs[activeGraphId];
+            if (!currentGraph || currentGraph.nodes.length < 2) return;
+
+            // Empty array = "use current RF selection". Undefined = "all nodes".
+            let selectedNodeIds: string[] | undefined = action.nodeIds;
+            if (selectedNodeIds && selectedNodeIds.length === 0) {
+                selectedNodeIds = reactFlowInstance.getNodes().filter(n => n.selected).map(n => n.id);
+                if (selectedNodeIds.length < 2) return;
+            }
+
+            const targets = computeLayout(
+                { nodes: currentGraph.nodes, edges: currentGraph.edges },
+                action.strategy,
+                { selectedNodeIds },
+            );
+            if (targets.length === 0) return;
+
+            const targetMap = new Map(targets.map(t => [t.id, t] as const));
+            const startPositions = new Map(
+                reactFlowInstance.getNodes().map(n => [n.id, { x: n.position.x, y: n.position.y }] as const)
+            );
+
+            const DURATION = 450;
+            const startTs = performance.now();
+            const ease = (t: number) => 1 - Math.pow(1 - t, 3); // ease-out cubic
+
+            const step = (now: number) => {
+                const t = Math.min(1, (now - startTs) / DURATION);
+                const k = ease(t);
+                const currentNodes = reactFlowInstance.getNodes();
+                reactFlowInstance.setNodes(currentNodes.map(n => {
+                    const tgt = targetMap.get(n.id);
+                    const start = startPositions.get(n.id);
+                    if (!tgt || !start) return n;
+                    return {
+                        ...n,
+                        position: {
+                            x: start.x + (tgt.x - start.x) * k,
+                            y: start.y + (tgt.y - start.y) * k,
+                        },
+                    };
+                }));
+                if (t < 1) {
+                    requestAnimationFrame(step);
+                } else {
+                    // Commit final positions to the store — single undo entry.
+                    batchUpdatePositions(targets);
+                    // Reframe.
+                    reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+                }
+            };
+            requestAnimationFrame(step);
         } else if (action.type === 'advance-next') {
             const fromNodeId = action.fromNodeId;
             if (!activeGraphId) return;
@@ -497,7 +553,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 }
             }, 100);
         }
-    }, [pendingCanvasAction, clearCanvasAction, deleteSelected, handleFitView, activeGraphId, reactFlowInstance]);
+    }, [pendingCanvasAction, clearCanvasAction, deleteSelected, handleFitView, activeGraphId, reactFlowInstance, batchUpdatePositions]);
 
     // (hasSelection tracked via store's setHasSelection)
 
@@ -796,6 +852,9 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         }
 
         // Pane menu
+        const organize = (strategy: LayoutStrategy) => {
+            useWorkspaceStore.getState().dispatchCanvasAction({ type: 'auto-organize', strategy });
+        };
         return [
             {
                 label: 'New Action Node',
@@ -833,6 +892,17 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                     });
                     setAutoEditNodeId(nodeId);
                 },
+            },
+            {
+                label: 'Auto-Organize',
+                icon: <Wand2 className="w-4 h-4" />,
+                submenu: [
+                    { label: 'Cluster (smart)', icon: <Sparkles className="w-4 h-4" />, onClick: () => organize('cluster') },
+                    { label: 'Grid', icon: <Grid3x3 className="w-4 h-4" />, onClick: () => organize('grid') },
+                    { label: 'Hierarchy', icon: <Network className="w-4 h-4" />, onClick: () => organize('hierarchy') },
+                    { label: 'Flow', icon: <GitBranch className="w-4 h-4" />, onClick: () => organize('flow') },
+                ],
+                onClick: () => {},
             },
         ];
     }, [activeGraphId, graph, reactFlowInstance, removeEdge, removeNode, removeNodes, updateNode, batchUpdateNodes, setNodeColor, addNode, setAutoEditNodeId]);

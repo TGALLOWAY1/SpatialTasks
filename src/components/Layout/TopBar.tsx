@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { ChevronRight, Home, Undo2, Redo2, Trash2, BoxSelect, Link, Menu, LayoutGrid, List, Crosshair, MoreVertical, Eye, Zap, Maximize2 } from 'lucide-react';
+import { ChevronRight, Home, Undo2, Redo2, Trash2, BoxSelect, Link, Menu, LayoutGrid, List, Crosshair, MoreVertical, Eye, Zap, Maximize2, Wand2, Sparkles, Grid3x3, Network, GitBranch } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useStore } from 'zustand';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 import { SaveIndicator } from '../UI/SaveIndicator';
+import { LayoutMenu } from '../Canvas/LayoutMenu';
 
 export const TopBar: React.FC = () => {
     const { isTouchDevice, screenSize } = useDeviceDetect();
@@ -126,6 +127,7 @@ export const TopBar: React.FC = () => {
                 {/* Desktop: show all buttons inline */}
                 {!isTouchDevice && (
                     <>
+                        <LayoutMenu />
                         <button
                             onClick={() => undo()}
                             disabled={pastStates.length === 0}
@@ -220,6 +222,41 @@ export const TopBar: React.FC = () => {
                                 >
                                     <Maximize2 className="w-4 h-4 flex-shrink-0" />
                                     View Full Flow
+                                </button>
+
+                                <div className="border-t border-gray-700 my-1" />
+
+                                <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wide text-gray-500 flex items-center gap-2">
+                                    <Wand2 className="w-3 h-3" />
+                                    Auto-Organize
+                                </div>
+                                <button
+                                    onClick={() => { dispatchCanvasAction({ type: 'auto-organize', strategy: 'cluster' }); setOverflowOpen(false); }}
+                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left text-gray-300 hover:bg-gray-700 transition-colors"
+                                >
+                                    <Sparkles className="w-4 h-4 flex-shrink-0" />
+                                    Cluster (smart)
+                                </button>
+                                <button
+                                    onClick={() => { dispatchCanvasAction({ type: 'auto-organize', strategy: 'grid' }); setOverflowOpen(false); }}
+                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left text-gray-300 hover:bg-gray-700 transition-colors"
+                                >
+                                    <Grid3x3 className="w-4 h-4 flex-shrink-0" />
+                                    Grid
+                                </button>
+                                <button
+                                    onClick={() => { dispatchCanvasAction({ type: 'auto-organize', strategy: 'hierarchy' }); setOverflowOpen(false); }}
+                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left text-gray-300 hover:bg-gray-700 transition-colors"
+                                >
+                                    <Network className="w-4 h-4 flex-shrink-0" />
+                                    Hierarchy
+                                </button>
+                                <button
+                                    onClick={() => { dispatchCanvasAction({ type: 'auto-organize', strategy: 'flow' }); setOverflowOpen(false); }}
+                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left text-gray-300 hover:bg-gray-700 transition-colors"
+                                >
+                                    <GitBranch className="w-4 h-4 flex-shrink-0" />
+                                    Flow
                                 </button>
 
                                 <div className="border-t border-gray-700 my-1" />
