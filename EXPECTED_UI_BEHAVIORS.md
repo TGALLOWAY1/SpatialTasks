@@ -205,6 +205,17 @@ All shortcuts should only fire when the canvas has focus (not when typing in an 
 
 ---
 
+## 10a. Accent Colors
+
+- Every node can be tagged with one of 7 accent colors (gray, red, amber, green, blue, purple, pink) or left uncolored. The accent has **no semantic meaning** — no filtering, no dependency behavior. It is a purely visual categorization tool.
+- Accent is set via the node's context menu (desktop right-click) or action sheet (touch long-press): **Set Color → [swatch row]**. The "No color" option clears the accent.
+- Multi-select context menu also offers a batch "Set Color" submenu that applies to every selected node in a single undo step.
+- **Graph view**: the accent renders as a 3px left-edge bar inside the node card. Nodes without an accent are visually identical to pre-feature.
+- **List view**: the accent renders as an 8px dot next to the title.
+- Accent persists through Zustand `persist` (localStorage) and Supabase sync, and is undo/redo-tracked.
+
+---
+
 ## 11. Status Cycling
 
 - **Click the status icon** (left side of an action node) → cycles through: Todo → In Progress → Done → Todo.

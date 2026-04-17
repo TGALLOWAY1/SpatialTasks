@@ -12,6 +12,7 @@ import { getContainerProgress, getBlockingNodes } from '../../utils/logic';
 import { magicExpand, GeminiError } from '../../services/gemini';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
+import { ACCENT_BAR } from '../../utils/accent';
 
 const WIDTH = 200;
 const HEIGHT = 80;
@@ -283,6 +284,16 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
             </NodeResizeControl>
 
             <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-indigo-400 !top-1/2 !-translate-y-1/2" />
+
+            {data.meta?.color && (
+                <div
+                    aria-hidden="true"
+                    className={clsx(
+                        "absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg",
+                        ACCENT_BAR[data.meta.color]
+                    )}
+                />
+            )}
 
             <div className="flex flex-col gap-2">
                 <div className="flex items-start justify-between border-b border-indigo-800 pb-2 mb-1">

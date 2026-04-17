@@ -11,6 +11,7 @@ import ReactFlow, {
     ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { clsx } from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { ContainerNode } from '../Nodes/ContainerNode';
@@ -19,7 +20,9 @@ import { ContextMenu, MenuItem } from '../UI/ContextMenu';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { ActionSheet } from '../UI/ActionSheet';
 import { FloatingActionButton } from '../UI/FloatingActionButton';
-import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Sparkles, Maximize2 } from 'lucide-react';
+import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Sparkles, Maximize2, Palette, Ban } from 'lucide-react';
+import { ACCENT_COLORS, ACCENT_BAR, ACCENT_LABEL } from '../../utils/accent';
+import type { AccentColor } from '../../types';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 import { isNodeActionable, getBlockingNodes, BlockingNodeInfo } from '../../utils/logic';
 import { StepDetailPanel } from '../ExecutionPanel/StepDetailPanel';
@@ -49,6 +52,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     const addEdge = useWorkspaceStore(state => state.addEdge);
     const addNode = useWorkspaceStore(state => state.addNode);
     const batchUpdateNodes = useWorkspaceStore(state => state.batchUpdateNodes);
+    const setNodeColor = useWorkspaceStore(state => state.setNodeColor);
     const batchUpdatePositions = useWorkspaceStore(state => state.batchUpdatePositions);
     const selectMode = useWorkspaceStore(state => state.selectMode);
     const setHasSelection = useWorkspaceStore(state => state.setHasSelection);
@@ -701,6 +705,18 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
             }];
         }
 
+        const colorSwatch = (c: AccentColor) => (
+            <span className={clsx("inline-block w-3 h-3 rounded-full", ACCENT_BAR[c])} aria-hidden="true" />
+        );
+        const colorSubmenuFor = (apply: (c: AccentColor | null) => void): MenuItem[] => [
+            { label: 'No color', icon: <Ban className="w-4 h-4" />, onClick: () => apply(null) },
+            ...ACCENT_COLORS.map(c => ({
+                label: ACCENT_LABEL[c],
+                icon: colorSwatch(c),
+                onClick: () => apply(c),
+            })),
+        ];
+
         if (target.nodeId) {
             // Multi-select handling (desktop context menu only)
             if (opts?.multiSelect) {
@@ -714,6 +730,14 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                             { label: 'In Progress', icon: <Clock className="w-4 h-4" />, onClick: () => batchUpdateNodes(nodeIds, { status: 'in_progress' }) },
                             { label: 'Done', icon: <CheckCircle2 className="w-4 h-4" />, onClick: () => batchUpdateNodes(nodeIds, { status: 'done' }) },
                         ],
+                        onClick: () => {},
+                    },
+                    {
+                        label: `Set Color (${selectedNodes.length} nodes)`,
+                        icon: <Palette className="w-4 h-4" />,
+                        submenu: colorSubmenuFor((c) => {
+                            nodeIds.forEach(id => setNodeColor(id, c));
+                        }),
                         onClick: () => {},
                     },
                     {
@@ -745,6 +769,12 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                     onClick: () => {},
                 });
             }
+            items.push({
+                label: 'Set Color',
+                icon: <Palette className="w-4 h-4" />,
+                submenu: colorSubmenuFor((c) => setNodeColor(target.nodeId!, c)),
+                onClick: () => {},
+            });
             items.push({
                 label: 'Delete',
                 icon: <Trash2 className="w-4 h-4" />,
@@ -805,7 +835,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 },
             },
         ];
-    }, [activeGraphId, graph, reactFlowInstance, removeEdge, removeNode, removeNodes, updateNode, batchUpdateNodes, addNode, setAutoEditNodeId]);
+    }, [activeGraphId, graph, reactFlowInstance, removeEdge, removeNode, removeNodes, updateNode, batchUpdateNodes, setNodeColor, addNode, setAutoEditNodeId]);
 
     const buildActionSheetItems = useCallback((): MenuItem[] => {
         if (!actionSheet) return [];
