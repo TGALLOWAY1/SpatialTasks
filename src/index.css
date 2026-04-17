@@ -7,6 +7,33 @@
   --sar: env(safe-area-inset-right);
   --sab: env(safe-area-inset-bottom);
   --sal: env(safe-area-inset-left);
+
+  /* Surface tokens (dark default). Light theme overrides in [data-theme="light"]. */
+  --bg-app: #000;
+  --bg-canvas: #030712;      /* gray-950 */
+  --bg-panel: #0b1120;       /* near gray-900 */
+  --bg-panel-2: #111827;     /* gray-900 */
+  --bg-elevated: #1f2937;    /* gray-800 */
+  --bg-dot: #374151;         /* gray-700 — ReactFlow background dots */
+  --text-primary: #f9fafb;   /* gray-50 */
+  --text-secondary: #d1d5db; /* gray-300 */
+  --text-muted: #9ca3af;     /* gray-400 */
+  --border-default: #374151; /* gray-700 */
+  --border-strong: #4b5563;  /* gray-600 */
+}
+
+[data-theme="light"] {
+  --bg-app: #f9fafb;
+  --bg-canvas: #f3f4f6;
+  --bg-panel: #ffffff;
+  --bg-panel-2: #f9fafb;
+  --bg-elevated: #e5e7eb;
+  --bg-dot: #d1d5db;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --border-default: #e5e7eb;
+  --border-strong: #cbd5e1;
 }
 
 html, body, #root {
@@ -17,7 +44,53 @@ html, body, #root {
   /* Prevent iOS Safari bounce scroll when modals/sheets are open */
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
-  background: #000;
+  background: var(--bg-app);
+}
+
+/* Light-theme utility overrides. Replaces Tailwind's hardcoded gray-9xx/8xx/7xx
+ * with our surface tokens only when [data-theme="light"] is set on <html>.
+ * Scoped narrowly so it doesn't affect semantic colors (red-500, purple-500, etc.). */
+[data-theme="light"] .bg-black { background-color: var(--bg-app) !important; }
+[data-theme="light"] .bg-gray-950 { background-color: var(--bg-canvas) !important; }
+[data-theme="light"] .bg-gray-900 { background-color: var(--bg-panel-2) !important; }
+[data-theme="light"] .bg-gray-800,
+[data-theme="light"] .bg-slate-800 { background-color: var(--bg-elevated) !important; }
+[data-theme="light"] .bg-slate-900 { background-color: var(--bg-panel) !important; }
+
+[data-theme="light"] .text-white,
+[data-theme="light"] .text-gray-50,
+[data-theme="light"] .text-gray-100,
+[data-theme="light"] .text-gray-200,
+[data-theme="light"] .text-slate-100,
+[data-theme="light"] .text-slate-200 { color: var(--text-primary) !important; }
+
+[data-theme="light"] .text-gray-300,
+[data-theme="light"] .text-gray-400,
+[data-theme="light"] .text-slate-300,
+[data-theme="light"] .text-slate-400 { color: var(--text-secondary) !important; }
+
+[data-theme="light"] .text-gray-500,
+[data-theme="light"] .text-gray-600,
+[data-theme="light"] .text-slate-500,
+[data-theme="light"] .text-slate-600 { color: var(--text-muted) !important; }
+
+[data-theme="light"] .border-gray-700,
+[data-theme="light"] .border-gray-800,
+[data-theme="light"] .border-slate-700,
+[data-theme="light"] .border-slate-800 { border-color: var(--border-default) !important; }
+
+[data-theme="light"] .border-gray-600,
+[data-theme="light"] .border-slate-600 { border-color: var(--border-strong) !important; }
+
+/* ReactFlow controls in light mode */
+[data-theme="light"] .react-flow__controls-button {
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-default);
+}
+[data-theme="light"] .react-flow__controls-button svg { fill: var(--text-muted); }
+[data-theme="light"] .react-flow__controls {
+  border: 1px solid var(--border-default);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 /* ReactFlow controls — dark theme override */

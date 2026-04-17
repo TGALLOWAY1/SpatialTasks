@@ -897,7 +897,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 fitView
                 className="bg-gray-950"
             >
-                <Background color="#374151" gap={20} />
+                <Background color="var(--bg-dot)" gap={20} />
                 {!isTouchDevice && <Controls className="bg-gray-800 border-gray-700 fill-gray-100" />}
                 {!isTouchDevice && (
                     <MiniMap

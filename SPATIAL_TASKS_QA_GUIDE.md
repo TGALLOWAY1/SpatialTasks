@@ -1365,3 +1365,18 @@ The following test cases verify fixes from the codebase audit (`SPATIAL_TASKS_CO
 | PT-8 | Touch: bottom sheet instead of chip bar | 1. On mobile/touch device, tap the "Blocked" badge on a blocked node | Bottom sheet slides up listing blockers with ≥44px tap targets |
 | PT-9 | Blocked state stays blocked after predecessor partial complete | 1. Mark some (not all) leaves of a container predecessor done 2. Click downstream node's blocker | Chip still lists the container with updated percentage |
 | PT-10 | Unblocked nodes show no badge | 1. Mark all predecessors done on a previously-blocked node | "Blocked" badge and lock icon disappear; status cycling works again |
+
+### Feature: Theme Toggle (Dark / Light)
+
+**What changed:** A sidebar toggle switches between dark (default) and light themes. Surface colors (backgrounds, borders, text) are themed; semantic colors (red, amber, accents) are not.
+
+| # | Test Case | Steps | Expected Result |
+|---|-----------|-------|-----------------|
+| TH-1 | Default is dark | 1. Fresh localStorage 2. Load app | Canvas, sidebar, top bar are dark |
+| TH-2 | Toggle to light | 1. Click "Light theme" in sidebar | Canvas becomes light gray, sidebar white, text dark |
+| TH-3 | Toggle back to dark | 1. Click "Dark theme" | Reverts to dark palette |
+| TH-4 | Theme persists across reload | 1. Set light 2. Reload | Still light |
+| TH-5 | ReactFlow dots re-theme | 1. Toggle to light | Background dots become lighter gray |
+| TH-6 | ReactFlow controls re-theme | 1. Toggle to light | +/−/fit/lock buttons have light background |
+| TH-7 | Semantic colors preserved | 1. Put a blocked node on canvas 2. Toggle light | Red "Blocked" badge remains red |
+| TH-8 | Accent colors preserved | 1. Color a node red 2. Toggle light | Red accent bar still visible |

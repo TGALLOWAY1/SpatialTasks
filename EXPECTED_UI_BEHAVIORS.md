@@ -223,6 +223,17 @@ All shortcuts should only fire when the canvas has focus (not when typing in an 
 
 ---
 
+## 10e. Theming (Dark / Light)
+
+- The app ships **dark theme by default**; users can switch to light via the sidebar footer toggle (sun/moon icon + "Light theme" / "Dark theme" label).
+- Theme is stored on `settings.theme` (`'dark' | 'light'`) and persists through `persist` + Supabase sync.
+- The theme is applied as `data-theme="light"` on the `<html>` element. Dark is the absence of that attribute.
+- Surface tokens (`--bg-canvas`, `--bg-panel`, `--text-primary`, `--border-default`, etc.) drive the palette; Tailwind utility classes like `bg-gray-900`, `text-slate-200`, `border-gray-700` are overridden via CSS variables when `[data-theme="light"]` is active.
+- Semantic colors (red for blocked, amber for execution-mode highlights, accent palette) are NOT remapped — only neutral surfaces are themed.
+- ReactFlow background dots and control buttons also respect the theme.
+
+---
+
 ## 11. Status Cycling
 
 - **Click the status icon** (left side of an action node) → cycles through: Todo → In Progress → Done → Todo.

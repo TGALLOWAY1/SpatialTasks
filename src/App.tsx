@@ -25,6 +25,12 @@ function App() {
     const projects = useWorkspaceStore(state => state.projects);
     const loadProject = useWorkspaceStore(state => state.loadProject);
     const viewMode = useWorkspaceStore(state => state.viewMode);
+    const theme = useWorkspaceStore(state => state.settings.theme ?? 'dark');
+
+    // Apply theme at the document root so CSS variable overrides kick in.
+    useEffect(() => {
+        document.documentElement.dataset.theme = theme;
+    }, [theme]);
     const [showFlowGenerator, setShowFlowGenerator] = useState(false);
     const [showMarkdownImporter, setShowMarkdownImporter] = useState(false);
     const [showShortcuts, setShowShortcuts] = useState(false);
