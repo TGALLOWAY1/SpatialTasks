@@ -205,6 +205,18 @@ All shortcuts should only fire when the canvas has focus (not when typing in an 
 
 ---
 
+## 10c. Cross-View Selection Sync
+
+- A single "focused node" is tracked at the workspace level so selection survives graph ↔ list view switches.
+- **Graph → List**: select a node on the canvas, switch to list view → that row renders with a purple highlight ring; the list auto-scrolls it into view.
+- **List → Graph**: click a row in list view, switch to graph view → that node is pre-selected and the viewport auto-fits to it.
+- Multi-select remains view-local (only single-node focus syncs).
+- Clicking empty canvas or the empty list area clears the focused node.
+- Cross-graph focus is a no-op — the store tracks the originating `graphId` and only applies sync when the user is in the same graph.
+- The focused node is **transient**: not persisted across reloads.
+
+---
+
 ## 11. Status Cycling
 
 - **Click the status icon** (left side of an action node) → cycles through: Todo → In Progress → Done → Todo.

@@ -56,6 +56,9 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     const clearConnectMode = useWorkspaceStore(state => state.clearConnectMode);
     const setAutoEditNodeId = useWorkspaceStore(state => state.setAutoEditNodeId);
     const executionMode = useWorkspaceStore(state => state.executionMode);
+    const focusedNodeId = useWorkspaceStore(state => state.focusedNodeId);
+    const focusedNodeGraphId = useWorkspaceStore(state => state.focusedNodeGraphId);
+    const setFocusedNode = useWorkspaceStore(state => state.setFocusedNode);
 
     const reactFlowInstance = useReactFlow();
 
@@ -88,9 +91,17 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
 
     const graph = activeGraphId ? graphs[activeGraphId] : null;
 
-    // Transform to ReactFlow format
+    // Tracks whether we've seeded the initial selection from the workspace-focused node.
+    const seededFocusRef = useRef(false);
+
+    // Transform to ReactFlow format. On first render after mount, seed selection
+    // from the cross-view `focusedNodeId`; afterward, selection is owned by RF.
     const nodes: RFNode[] = useMemo(() => {
         if (!graph) return [];
+        const shouldSeed = !seededFocusRef.current
+            && !!focusedNodeId
+            && (!focusedNodeGraphId || focusedNodeGraphId === graph.id)
+            && graph.nodes.some(n => n.id === focusedNodeId);
         return graph.nodes.map(n => ({
             id: n.id,
             type: n.type,
@@ -98,7 +109,12 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
             data: { ...n, _isConnectSource: connectMode.sourceNodeId === n.id },
             draggable: !connectMode.active,
             style: { width: n.width ?? 200 },
+            selected: shouldSeed && n.id === focusedNodeId ? true : undefined,
         }));
+        // Intentional: we only want to re-compute when the graph or connect mode
+        // changes. focusedNodeId changes after the user interacts with the canvas
+        // and must NOT reset RF's internal selection.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [graph, connectMode]);
 
     const edges: RFEdge[] = useMemo(() => {
@@ -395,6 +411,26 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [deleteSelected, handleFitView, graph, reactFlowInstance, setHasSelection, createQuickNodeAtViewportCenter, connectMode.active, clearConnectMode, contextMenu, actionSheet, quickAdd]);
+
+    // On mount, after the initial seeded render, fit view to the focused node and
+    // lock out further seeding so RF owns selection from here on.
+    useEffect(() => {
+        if (seededFocusRef.current) return;
+        seededFocusRef.current = true;
+        if (!focusedNodeId) return;
+        if (!activeGraphId) return;
+        if (focusedNodeGraphId && focusedNodeGraphId !== activeGraphId) return;
+        const timer = window.setTimeout(() => {
+            const rfNodes = reactFlowInstance.getNodes();
+            const node = rfNodes.find(n => n.id === focusedNodeId);
+            if (!node) return;
+            setHasSelection(true);
+            reactFlowInstance.fitView({ nodes: [node], padding: 0.4, duration: 300, maxZoom: 1.5 });
+        }, 80);
+        return () => window.clearTimeout(timer);
+        // Runs exactly once on mount — see nodes memo above for the selection seeding.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Process canvas actions dispatched from other components via the store
     const pendingCanvasAction = useWorkspaceStore(state => state.pendingCanvasAction);
@@ -812,6 +848,12 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 onPaneContextMenu={handlePaneContextMenu}
                 onSelectionChange={({ nodes: selNodes, edges: selEdges }) => {
                     setHasSelection((selNodes?.length ?? 0) > 0 || (selEdges?.length ?? 0) > 0);
+                    // Cross-view focus sync: only track single-node selections (multi-select stays view-local).
+                    if (selNodes && selNodes.length === 1) {
+                        setFocusedNode(selNodes[0].id);
+                    } else if (!selNodes || selNodes.length === 0) {
+                        if (useWorkspaceStore.getState().focusedNodeId) setFocusedNode(null);
+                    }
                 }}
                 panOnDrag={isTouchDevice ? !selectMode : true}
                 selectionOnDrag={isTouchDevice ? selectMode : true}

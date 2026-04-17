@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Node, Graph } from '../../types';
 import { isNodeBlocked, getContainerProgress } from '../../utils/logic';
@@ -98,8 +98,21 @@ const ActionItem: React.FC<{ node: Node; blocked: boolean; depth: number; isPara
     const cycleNodeStatus = useWorkspaceStore(state => state.cycleNodeStatus);
     const updateNode = useWorkspaceStore(state => state.updateNode);
     const removeNode = useWorkspaceStore(state => state.removeNode);
+    const focusedNodeId = useWorkspaceStore(state => state.focusedNodeId);
+    const setFocusedNode = useWorkspaceStore(state => state.setFocusedNode);
     const [editing, setEditing] = useState(false);
     const [editValue, setEditValue] = useState(node.title);
+    const rowRef = useRef<HTMLDivElement>(null);
+    const isFocused = focusedNodeId === node.id;
+
+    // On mount (list view entered), scroll the focused row into view.
+    useEffect(() => {
+        if (isFocused && rowRef.current) {
+            rowRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+        // Intentionally only run once per mount — switching focused node afterward shouldn't hijack scroll.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleStatusClick = useCallback(() => {
         if (blocked) return;
@@ -115,10 +128,17 @@ const ActionItem: React.FC<{ node: Node; blocked: boolean; depth: number; isPara
 
     return (
         <div
+            ref={rowRef}
+            onClick={(e) => {
+                // Don't steal focus when clicking buttons inside the row.
+                if ((e.target as HTMLElement).closest('button')) return;
+                setFocusedNode(node.id, graphId);
+            }}
             className={clsx(
-                'flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors',
+                'flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors cursor-pointer',
                 blocked ? 'bg-slate-900/50 border-slate-800 opacity-70' : 'bg-slate-800/50 border-slate-700/50 hover:border-slate-600',
                 node.status === 'done' && 'opacity-60',
+                isFocused && 'ring-2 ring-purple-500/60 border-purple-500/60',
             )}
             style={{ marginLeft: depth * 24 }}
         >
@@ -572,8 +592,16 @@ export const ListView: React.FC = () => {
     const totalActions = graph.nodes.filter(n => n.type === 'action').length;
 
     return (
-        <div className="flex-1 h-full bg-gray-950 overflow-y-auto">
-            <div className="max-w-2xl mx-auto px-4 py-6 space-y-3">
+        <div
+            className="flex-1 h-full bg-gray-950 overflow-y-auto"
+            onClick={(e) => {
+                // Click on empty list area (not a task row) clears focused node.
+                if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('list-view-scroller')) {
+                    useWorkspaceStore.getState().setFocusedNode(null);
+                }
+            }}
+        >
+            <div className="max-w-2xl mx-auto px-4 py-6 space-y-3 list-view-scroller">
                 {/* Summary header */}
                 {totalActions > 0 && (
                     <div className="flex items-center justify-between px-2 pb-2 border-b border-gray-800">

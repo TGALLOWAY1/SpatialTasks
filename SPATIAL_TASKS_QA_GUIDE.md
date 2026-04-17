@@ -1321,3 +1321,17 @@ The following test cases verify fixes from the codebase audit (`SPATIAL_TASKS_CO
 | AF-13 | FlowGenerator loads on demand | 1. Click "Generate Flow" button | FlowGenerator chunk loads; modal opens correctly |
 | AF-14 | MarkdownImporter loads on demand | 1. Click "Import Plan" button | MarkdownImporter chunk loads; modal opens correctly |
 | AF-15 | Build produces multiple chunks | 1. Run `npm run build` | Output shows separate chunks for react-flow, supabase, and lazy-loaded modals |
+
+### Feature: Cross-View Selection Sync
+
+**What changed:** Selecting a single node in graph view pre-selects it in list view, and vice versa. Multi-select is not synced.
+
+| # | Test Case | Steps | Expected Result |
+|---|-----------|-------|-----------------|
+| SS-1 | Graph → List (single node) | 1. Select a node on canvas 2. Switch to list view | That row has a purple ring; list scrolls it into view |
+| SS-2 | List → Graph | 1. Click a row in list view 2. Switch to graph view | That node is selected; viewport auto-frames it |
+| SS-3 | Multi-select NOT synced | 1. Shift-click 3 nodes on canvas 2. Switch to list view | No row is highlighted |
+| SS-4 | Deselect on empty canvas | 1. Select a node 2. Click empty canvas area 3. Switch to list view | No row is highlighted |
+| SS-5 | Deselect on empty list area | 1. Click a row 2. Click the empty list background 3. Switch to graph view | No node is pre-selected |
+| SS-6 | Cross-graph is no-op | 1. Select a node in root graph 2. Drill into a container 3. Observe | The container's canvas doesn't attempt to select the parent-graph node |
+| SS-7 | Not persisted | 1. Select a node 2. Reload | No node is selected on reload |
