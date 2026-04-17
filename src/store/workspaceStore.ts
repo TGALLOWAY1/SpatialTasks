@@ -320,14 +320,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             },
 
             addNode: (node) => {
-                const { activeGraphId, graphs } = get();
+                const { activeGraphId, graphs, settings } = get();
                 if (!activeGraphId) return;
 
                 const graph = graphs[activeGraphId];
                 const updatedGraph = { ...graph, nodes: [...graph.nodes, node] };
 
+                // First node ever = dismiss the onboarding overlay permanently.
+                const patch: Partial<typeof settings> = settings.hasSeenOnboarding
+                    ? {}
+                    : { hasSeenOnboarding: true };
+
                 set({
-                    graphs: { ...graphs, [activeGraphId]: updatedGraph }
+                    graphs: { ...graphs, [activeGraphId]: updatedGraph },
+                    ...(Object.keys(patch).length ? { settings: { ...settings, ...patch } } : {}),
                 });
             },
 

@@ -223,6 +223,16 @@ All shortcuts should only fire when the canvas has focus (not when typing in an 
 
 ---
 
+## 10d. Empty-Canvas Onboarding
+
+- A brand-new user opening an empty root graph sees a rich onboarding overlay: three semi-transparent "ghost" nodes with dashed borders connected by dashed arrows, a call-to-action, shortcut hints, and a "Generate Flow with AI" button.
+- A **Skip** link in the top-right dismisses the overlay permanently.
+- Adding any node (via double-click, `N`, `G`, FAB, right-click menu, or any other path) also permanently dismisses the overlay.
+- Persisted via `settings.hasSeenOnboarding` in Zustand `persist` — the overlay never returns once dismissed, even if the canvas becomes empty again later.
+- The full onboarding is only shown in the **root** graph (`navStack.length === 1`). Empty container child graphs fall back to the subtler empty-state hint.
+
+---
+
 ## 11. Status Cycling
 
 - **Click the status icon** (left side of an action node) → cycles through: Todo → In Progress → Done → Todo.
