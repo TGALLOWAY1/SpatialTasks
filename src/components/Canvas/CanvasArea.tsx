@@ -24,8 +24,9 @@ import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, S
 import { ACCENT_COLORS, ACCENT_BAR, ACCENT_LABEL } from '../../utils/accent';
 import type { AccentColor } from '../../types';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
-import { isNodeActionable } from '../../utils/logic';
+import { isNodeActionable, getBlockingNodes, BlockingNodeInfo } from '../../utils/logic';
 import { StepDetailPanel } from '../ExecutionPanel/StepDetailPanel';
+import { BlockedSpotlight, useBlockingTitles } from './BlockedSpotlight';
 
 const nodeTypes = {
     container: ContainerNode,
@@ -89,6 +90,13 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         message: string;
         onConfirm: () => void;
     } | null>(null);
+
+    // Blocked-by spotlight state (transient UI state, not persisted)
+    const [spotlight, setSpotlight] = useState<{
+        sourceNodeId: string;
+        blockers: BlockingNodeInfo[];
+    } | null>(null);
+    const spotlightTitles = useBlockingTitles(spotlight?.blockers ?? []);
 
     const graph = activeGraphId ? graphs[activeGraphId] : null;
 
@@ -414,6 +422,42 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
             deleteSelected();
         } else if (action.type === 'fit-view') {
             handleFitView();
+        } else if (action.type === 'spotlight-blockers') {
+            if (!activeGraphId) return;
+            const currentGraph = useWorkspaceStore.getState().graphs[activeGraphId];
+            if (!currentGraph) return;
+            const allGraphs = useWorkspaceStore.getState().graphs;
+            const sourceNode = currentGraph.nodes.find(n => n.id === action.sourceNodeId);
+            if (!sourceNode) return;
+            const freshBlockers = getBlockingNodes(sourceNode, currentGraph, allGraphs);
+            if (freshBlockers.length === 0) return;
+
+            setSpotlight({ sourceNodeId: action.sourceNodeId, blockers: freshBlockers });
+
+            // Fit view to include the source + its blockers.
+            const idsToFit = [action.sourceNodeId, ...freshBlockers.map(b => b.nodeId)];
+            const rfNodes = reactFlowInstance.getNodes();
+            const nodesToFit = rfNodes.filter(n => idsToFit.includes(n.id));
+            if (nodesToFit.length > 0) {
+                reactFlowInstance.fitView({
+                    nodes: nodesToFit,
+                    padding: 0.3,
+                    duration: 400,
+                    maxZoom: 1.5,
+                });
+            }
+        } else if (action.type === 'select-and-frame') {
+            const rfNodes = reactFlowInstance.getNodes();
+            const rfNode = rfNodes.find(n => n.id === action.nodeId);
+            if (!rfNode) return;
+            reactFlowInstance.setNodes(rfNodes.map(n => ({ ...n, selected: n.id === action.nodeId })));
+            setHasSelection(true);
+            reactFlowInstance.fitView({
+                nodes: [rfNode],
+                padding: 0.4,
+                duration: 300,
+                maxZoom: 1.5,
+            });
         } else if (action.type === 'advance-next') {
             const fromNodeId = action.fromNodeId;
             if (!activeGraphId) return;
@@ -835,7 +879,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 onNodesChange={onNodesChange}
                 onConnect={onConnect}
                 onNodeClick={handleNodeClick}
-                onPaneClick={() => { setQuickAdd(null); setContextMenu(null); setActionSheet(null); if (connectMode.active) clearConnectMode(); }}
+                onPaneClick={() => { setQuickAdd(null); setContextMenu(null); setActionSheet(null); setSpotlight(null); if (connectMode.active) clearConnectMode(); }}
                 onDoubleClick={isTouchDevice ? undefined : handlePaneDoubleClick}
                 onNodeContextMenu={handleNodeContextMenu}
                 onEdgeContextMenu={handleEdgeContextMenu}
@@ -983,6 +1027,21 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
 
             {/* Execution mode step detail panel */}
             <StepDetailPanel />
+
+            {/* Predecessor Trace — blocked-by spotlight */}
+            {spotlight && (
+                <BlockedSpotlight
+                    sourceNodeId={spotlight.sourceNodeId}
+                    blockers={spotlight.blockers}
+                    titles={spotlightTitles}
+                    isSmallScreen={isTouchDevice}
+                    onDismiss={() => setSpotlight(null)}
+                    onJumpTo={(blockerId) => {
+                        setSpotlight(null);
+                        useWorkspaceStore.getState().dispatchCanvasAction({ type: 'select-and-frame', nodeId: blockerId });
+                    }}
+                />
+            )}
         </div>
     );
 };

@@ -30,14 +30,15 @@ No URL router — single-page app with in-memory navigation stack.
 | Focus View | viewMode='focus'; one task at a time with image, notes, status; auto-advances on done | `FocusView.tsx` + `ParallelChooser.tsx` |
 | Execution Mode | executionMode toggle | `CanvasArea.tsx` + `StepDetailPanel.tsx` |
 
-## Components (23 total)
+## Components (24 total)
 
 ### Canvas & Nodes
 | Component | File | Purpose |
 |-----------|------|---------|
 | CanvasArea | `src/components/Canvas/CanvasArea.tsx` | ReactFlow canvas, pan/zoom, shortcuts, touch gestures |
-| ActionNode | `src/components/Nodes/ActionNode.tsx` | Task node: status cycle, inline edit, resize, notes, images |
-| ContainerNode | `src/components/Nodes/ContainerNode.tsx` | Folder node: progress ring, magic expand, enter subgraph, images |
+| BlockedSpotlight | `src/components/Canvas/BlockedSpotlight.tsx` | Predecessor-trace overlay: pulse rings on blockers + chip bar / bottom sheet |
+| ActionNode | `src/components/Nodes/ActionNode.tsx` | Task node: status cycle, inline edit, resize, notes, images, interactive blocked badge |
+| ContainerNode | `src/components/Nodes/ContainerNode.tsx` | Folder node: progress ring, magic expand, enter subgraph, images, interactive blocked badge |
 | NotesEditor | `src/components/Nodes/NotesEditor.tsx` | Notes popover/modal for nodes |
 | ImagesEditor | `src/components/Nodes/ImagesEditor.tsx` | Visual References panel: inline thumbnail grid, upload, remove, with persisted open/closed state |
 | ImageLightbox | `src/components/Nodes/ImageLightbox.tsx` | Fullscreen image viewer with keyboard/arrow navigation |

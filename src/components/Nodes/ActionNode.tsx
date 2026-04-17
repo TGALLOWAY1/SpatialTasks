@@ -6,7 +6,7 @@ import { NotesEditor } from './NotesEditor';
 import { ImagesEditor } from './ImagesEditor';
 import { clsx } from 'clsx';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { isNodeBlocked, isNodeActionable } from '../../utils/logic';
+import { getBlockingNodes, isNodeActionable } from '../../utils/logic';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 import { ACCENT_BAR } from '../../utils/accent';
 
@@ -52,13 +52,15 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
         }
     }, [autoEditNodeId, data.id, data.title, setAutoEditNodeId]);
 
-    const { isBlocked, isActionable } = useMemo(() => {
+    const { isBlocked, isActionable, blockers } = useMemo(() => {
         const graphId = activeGraphId ?? data.graphId;
         const graph = graphId ? graphs[graphId] : undefined;
-        if (!graph) return { isBlocked: false, isActionable: false };
+        if (!graph) return { isBlocked: false, isActionable: false, blockers: [] };
+        const b = getBlockingNodes(data, graph, graphs);
         return {
-            isBlocked: isNodeBlocked(data, graph, graphs),
+            isBlocked: b.length > 0,
             isActionable: isNodeActionable(data, graph, graphs),
+            blockers: b,
         };
     }, [data, activeGraphId, graphs]);
 
@@ -69,10 +71,18 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
 
     const handleStatusClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
-        if (isBlocked) return;
+        if (isBlocked) {
+            dispatchCanvasAction({
+                type: 'spotlight-blockers',
+                sourceNodeId: data.id,
+                blockerIds: blockers.map(b => b.nodeId),
+            });
+            try { navigator.vibrate(10); } catch {}
+            return;
+        }
         cycleNodeStatus(data.id);
         try { navigator.vibrate(10); } catch {}
-    }, [isBlocked, cycleNodeStatus, data.id]);
+    }, [isBlocked, blockers, cycleNodeStatus, dispatchCanvasAction, data.id]);
 
     const save = useCallback(() => {
         if (editValue.trim() && editValue.trim() !== data.title) {
@@ -169,11 +179,9 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
             <div className="flex items-start gap-2">
                 <button
                     onClick={handleStatusClick}
-                    className={clsx(
-                        "flex-shrink-0 hover:scale-125 transition-transform touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center mt-0.5",
-                        isBlocked ? "cursor-not-allowed" : "cursor-pointer"
-                    )}
-                    title={isBlocked ? "Blocked" : "Click to cycle status"}
+                    className="flex-shrink-0 hover:scale-125 transition-transform touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center mt-0.5 cursor-pointer"
+                    title={isBlocked ? "Show blockers" : "Click to cycle status"}
+                    aria-label={isBlocked ? "Show blockers" : "Cycle status"}
                 >
                     <StatusIcon status={data.status} blocked={isBlocked} />
                 </button>
@@ -280,9 +288,21 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
             )}
 
             {isBlocked && (
-                <div className="absolute -top-2 -right-2 bg-red-900/80 text-red-200 text-[10px] px-1.5 py-0.5 rounded-full border border-red-800">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        dispatchCanvasAction({
+                            type: 'spotlight-blockers',
+                            sourceNodeId: data.id,
+                            blockerIds: blockers.map(b => b.nodeId),
+                        });
+                    }}
+                    className="absolute -top-2 -right-2 bg-red-900/80 text-red-200 text-[10px] px-1.5 py-0.5 rounded-full border border-red-800 hover:bg-red-800 hover:text-red-100 transition-colors touch:min-h-[28px]"
+                    title={`Blocked by ${blockers.length} predecessor${blockers.length === 1 ? '' : 's'}`}
+                    aria-label="Show blockers"
+                >
                     Blocked
-                </div>
+                </button>
             )}
 
             {highlight && (

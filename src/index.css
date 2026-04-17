@@ -146,3 +146,13 @@ html, body, #root {
 .animate-slide-in-left {
     animation: slide-in-left 0.2s ease-out;
 }
+
+/* Blocked-by spotlight — red pulse outline around blocker nodes. */
+@keyframes blocker-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.9), 0 0 18px 4px rgba(248, 113, 113, 0.35); }
+    50%      { box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.95), 0 0 28px 8px rgba(248, 113, 113, 0.55); }
+}
+.blocker-pulse {
+    animation: blocker-pulse 1.2s ease-in-out 2;
+    border-radius: 0.5rem;
+}
