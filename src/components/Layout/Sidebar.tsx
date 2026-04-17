@@ -5,7 +5,7 @@ import { useToastStore } from '../UI/Toast';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { supabase } from '../../lib/supabase';
 import { clsx } from 'clsx';
-import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus, Sparkles, FileUp, Keyboard } from 'lucide-react';
+import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus, Sparkles, FileUp, Keyboard, Sun, Moon } from 'lucide-react';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
 interface SidebarProps {
@@ -366,6 +366,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan, 
                                 Keyboard shortcuts
                             </button>
                         )}
+                        <button
+                            onClick={() => {
+                                const next = (settings.theme ?? 'dark') === 'dark' ? 'light' : 'dark';
+                                updateSettings({ theme: next });
+                            }}
+                            className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 w-full px-2 py-2 touch:min-h-[44px]"
+                            title={`Switch to ${(settings.theme ?? 'dark') === 'dark' ? 'light' : 'dark'} theme`}
+                            aria-label={`Switch to ${(settings.theme ?? 'dark') === 'dark' ? 'light' : 'dark'} theme`}
+                        >
+                            {(settings.theme ?? 'dark') === 'dark'
+                                ? <Sun className="w-3 h-3" />
+                                : <Moon className="w-3 h-3" />}
+                            {(settings.theme ?? 'dark') === 'dark' ? 'Light theme' : 'Dark theme'}
+                        </button>
                         <button
                             onClick={() => setShowResetConfirm(true)}
                             className="flex items-center gap-2 text-xs text-gray-500 hover:text-red-400 w-full px-2 py-2"
