@@ -5,15 +5,16 @@ import { useToastStore } from '../UI/Toast';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { supabase } from '../../lib/supabase';
 import { clsx } from 'clsx';
-import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus, Sparkles, FileUp } from 'lucide-react';
+import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus, Sparkles, FileUp, Keyboard } from 'lucide-react';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 
 interface SidebarProps {
     onGenerateFlow?: () => void;
     onImportPlan?: () => void;
+    onShowShortcuts?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan, onShowShortcuts }) => {
     const { isMobile } = useDeviceDetect();
     const sidebarOpen = useWorkspaceStore(state => state.sidebarOpen);
     const closeSidebar = useWorkspaceStore(state => state.closeSidebar);
@@ -354,6 +355,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan }
                                 <User className="w-3 h-3 shrink-0" />
                                 <span className="truncate">{user.email}</span>
                             </div>
+                        )}
+                        {onShowShortcuts && (
+                            <button
+                                onClick={onShowShortcuts}
+                                className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 w-full px-2 py-2"
+                                title="Show keyboard shortcuts (?)"
+                            >
+                                <Keyboard className="w-3 h-3" />
+                                Keyboard shortcuts
+                            </button>
                         )}
                         <button
                             onClick={() => setShowResetConfirm(true)}
