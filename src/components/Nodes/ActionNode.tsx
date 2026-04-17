@@ -8,6 +8,7 @@ import { clsx } from 'clsx';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { isNodeBlocked, isNodeActionable } from '../../utils/logic';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
+import { ACCENT_BAR } from '../../utils/accent';
 
 const MIN_WIDTH = 140;
 const MAX_WIDTH = 500;
@@ -154,6 +155,16 @@ export const ActionNode = memo(({ data, selected }: NodeProps<Node>) => {
             </NodeResizeControl>
 
             <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-slate-400 !top-1/2 !-translate-y-1/2" />
+
+            {data.meta?.color && (
+                <div
+                    aria-hidden="true"
+                    className={clsx(
+                        "absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg",
+                        ACCENT_BAR[data.meta.color]
+                    )}
+                />
+            )}
 
             <div className="flex items-start gap-2">
                 <button

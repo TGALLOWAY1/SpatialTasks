@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { temporal } from 'zundo';
 import { v4 as uuidv4 } from 'uuid';
-import { Workspace, Node, Graph, Edge, Project, WorkspaceSettings } from '../types';
+import { Workspace, Node, Graph, Edge, Project, WorkspaceSettings, AccentColor } from '../types';
 import { generateWorkspace } from '../utils/generator';
 import { saveGeminiConfig, loadGeminiConfig } from '../lib/workspaceSync';
 
@@ -69,6 +69,7 @@ interface WorkspaceState extends Workspace {
     // Graph edits
     addNode: (node: Node) => void;
     updateNode: (nodeId: string, data: Partial<Node>, graphId?: string) => void;
+    setNodeColor: (nodeId: string, color: AccentColor | null, graphId?: string) => void;
     removeNode: (nodeId: string, graphId?: string) => void;
     removeEdge: (edgeId: string) => void;
     removeNodes: (nodeIds: string[]) => void;
@@ -337,6 +338,24 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 if (!graph) return;
                 const updatedNodes = graph.nodes.map(n => n.id === nodeId ? { ...n, ...data } : n);
 
+                set({
+                    graphs: { ...graphs, [targetGraphId]: { ...graph, nodes: updatedNodes } }
+                });
+            },
+
+            setNodeColor: (nodeId, color, graphId?) => {
+                const { activeGraphId, graphs } = get();
+                const targetGraphId = graphId || activeGraphId;
+                if (!targetGraphId) return;
+
+                const graph = graphs[targetGraphId];
+                if (!graph) return;
+                const updatedNodes = graph.nodes.map(n => {
+                    if (n.id !== nodeId) return n;
+                    const { color: _drop, ...restMeta } = n.meta ?? {};
+                    const nextMeta = color ? { ...restMeta, color } : restMeta;
+                    return { ...n, meta: nextMeta };
+                });
                 set({
                     graphs: { ...graphs, [targetGraphId]: { ...graph, nodes: updatedNodes } }
                 });

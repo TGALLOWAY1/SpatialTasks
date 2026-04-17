@@ -1321,3 +1321,17 @@ The following test cases verify fixes from the codebase audit (`SPATIAL_TASKS_CO
 | AF-13 | FlowGenerator loads on demand | 1. Click "Generate Flow" button | FlowGenerator chunk loads; modal opens correctly |
 | AF-14 | MarkdownImporter loads on demand | 1. Click "Import Plan" button | MarkdownImporter chunk loads; modal opens correctly |
 | AF-15 | Build produces multiple chunks | 1. Run `npm run build` | Output shows separate chunks for react-flow, supabase, and lazy-loaded modals |
+
+### Feature: Node Accent Colors
+
+**What changed:** Nodes can be tagged with one of 7 accent colors via context menu / action sheet. Accent renders as a 3px left-edge bar in graph view and an 8px dot in list view.
+
+| # | Test Case | Steps | Expected Result |
+|---|-----------|-------|-----------------|
+| AC-1 | Set color on a single node | 1. Right-click a node 2. Set Color → Red | Red 3px bar appears on the node's left edge in graph view |
+| AC-2 | Clear color | 1. On a colored node, Set Color → No color | Bar disappears; node returns to default appearance |
+| AC-3 | Color persists in list view | 1. Color a node red 2. Switch to list view | Red dot next to title |
+| AC-4 | Batch color via multi-select | 1. Select 3+ nodes (Shift-click) 2. Right-click → Set Color → Blue | All selected nodes show blue bar; single undo reverts all |
+| AC-5 | Persist across reload | 1. Color a node, reload | Color still applied |
+| AC-6 | Undo restores previous color | 1. Color node red 2. Change to blue 3. Undo | Node is red again |
+| AC-7 | Touch: action sheet color picker | 1. Long-press a node on touch 2. Set Color → Green | Green accent applied |

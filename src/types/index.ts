@@ -12,12 +12,20 @@ export interface ImageAttachment {
     // hidden?: boolean;
 }
 
+/**
+ * Closed enum of accent colors for a node. Used purely for at-a-glance
+ * categorization — no semantic meaning, no filtering. Closed set (vs.
+ * arbitrary hex) keeps Tailwind's JIT happy and preserves theme compatibility.
+ */
+export type AccentColor = 'gray' | 'red' | 'amber' | 'green' | 'blue' | 'purple' | 'pink';
+
 export interface NodeMeta {
     notes?: string;
     tags?: string[];
     verification?: string;
     images?: ImageAttachment[];
     imagesOpen?: boolean; // persisted open/closed state of the Visual References section
+    color?: AccentColor;  // optional accent color shown as a left-edge bar and list dot
     [key: string]: any;
 }
 
