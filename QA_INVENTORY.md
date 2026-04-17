@@ -37,6 +37,7 @@ No URL router — single-page app with in-memory navigation stack.
 |-----------|------|---------|
 | CanvasArea | `src/components/Canvas/CanvasArea.tsx` | ReactFlow canvas, pan/zoom, shortcuts, touch gestures |
 | BlockedSpotlight | `src/components/Canvas/BlockedSpotlight.tsx` | Predecessor-trace overlay: pulse rings on blockers + chip bar / bottom sheet |
+| LayoutMenu | `src/components/Canvas/LayoutMenu.tsx` | Toolbar popover for Auto-Organize: picks strategy (cluster/grid/hierarchy/flow), optional selection-only scope, remembers last used |
 | ActionNode | `src/components/Nodes/ActionNode.tsx` | Task node: status cycle, inline edit, resize, notes, images, interactive blocked badge |
 | ContainerNode | `src/components/Nodes/ContainerNode.tsx` | Folder node: progress ring, magic expand, enter subgraph, images, interactive blocked badge |
 | NotesEditor | `src/components/Nodes/NotesEditor.tsx` | Notes popover/modal for nodes |
@@ -116,7 +117,8 @@ No URL router — single-page app with in-memory navigation stack.
 | Remove node | `removeNode(id)` | Removes edges + child graphs recursively |
 | Batch remove | `removeNodes(ids[])` | Batch with cleanup |
 | Cycle status | `cycleNodeStatus(id)` | todo → in_progress → done → todo |
-| Batch positions | `batchUpdatePositions(updates[])` | Drag optimization |
+| Batch positions | `batchUpdatePositions(updates[])` | Drag optimization; also used to commit Auto-Organize results as a single undo entry |
+| Auto-organize canvas | dispatch `{type:'auto-organize', strategy, nodeIds?}` → `computeLayout()` → `batchUpdatePositions()` | One of four strategies (cluster/grid/hierarchy/flow); animated via rfInstance.setNodes; nodeIds=[] = selection only; remembers last strategy in `settings.preferredLayoutStrategy` |
 | Add edge | `addEdge(edge)` | Connection between nodes |
 | Remove edge | `removeEdge(id)` | Single edge removal |
 | Enter graph | `enterGraph(graphId, nodeId, label)` | Push navStack |
@@ -216,7 +218,8 @@ No URL router — single-page app with in-memory navigation stack.
 |-----|---------------|---------------|
 | Container completion derived, not persisted | `logic.ts`, `StepDetailPanel.tsx`, `ActionNode.tsx`, `ContainerNode.tsx`, `ListView.tsx`, `CanvasArea.tsx` | Container progress, blocking logic, execution mode completion |
 | SaveIndicator driven by sync pipeline | `SaveIndicator.tsx`, `workspaceStore.ts`, `workspaceSync.ts`, `useWorkspaceSync.ts` | Save indicator accuracy, sync error visibility |
-| Typed canvas actions replace DOM events | `workspaceStore.ts`, `CanvasArea.tsx`, `TopBar.tsx`, `ActionNode.tsx`, `StepDetailPanel.tsx` | Delete-selected, fit-view, advance-next |
+| Typed canvas actions replace DOM events | `workspaceStore.ts`, `CanvasArea.tsx`, `TopBar.tsx`, `ActionNode.tsx`, `StepDetailPanel.tsx` | Delete-selected, fit-view, advance-next, auto-organize |
+| Auto-Organize Canvas feature | `src/layout/*`, `src/components/Canvas/LayoutMenu.tsx`, `CanvasArea.tsx`, `TopBar.tsx`, `workspaceStore.ts`, `types/index.ts` | New `src/layout/` engine (cluster/grid/hierarchy/flow strategies + overlap resolver + centroid-preserve); toolbar popover (desktop) + overflow-menu entries (touch); pane context-menu submenu; undo via `batchUpdatePositions` single commit; last-used strategy persisted via `settings.preferredLayoutStrategy` |
 | Code splitting / lazy loading | `App.tsx`, `vite.config.ts` | Bundle size, lazy modal loading, chunk splitting |
 | Focus View mode | `workspaceStore.ts`, `logic.ts`, `TopBar.tsx`, `App.tsx`, `FocusView.tsx`, `ParallelChooser.tsx` | Single-task focus mode with image/notes/status, auto-advance, parallel chooser, container drill-in, edit modal |
 

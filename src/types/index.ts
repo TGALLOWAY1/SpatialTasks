@@ -108,6 +108,7 @@ export interface WorkspaceSettings {
     theme?: 'dark' | 'light';
     geminiApiKey?: string;
     geminiStatus?: GeminiConnectionStatus;
+    preferredLayoutStrategy?: 'cluster' | 'grid' | 'hierarchy' | 'flow';
     [key: string]: any;
 }
 

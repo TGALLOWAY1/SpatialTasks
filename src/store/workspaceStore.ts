@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { temporal } from 'zundo';
 import { v4 as uuidv4 } from 'uuid';
 import { Workspace, Node, Graph, Edge, Project, WorkspaceSettings, AccentColor } from '../types';
+import type { LayoutStrategy } from '../layout/layoutTypes';
 import { generateWorkspace } from '../utils/generator';
 import { saveGeminiConfig, loadGeminiConfig } from '../lib/workspaceSync';
 
@@ -12,7 +13,8 @@ export type CanvasAction =
     | { type: 'fit-view' }
     | { type: 'advance-next'; fromNodeId: string }
     | { type: 'spotlight-blockers'; sourceNodeId: string; blockerIds: string[] }
-    | { type: 'select-and-frame'; nodeId: string };
+    | { type: 'select-and-frame'; nodeId: string }
+    | { type: 'auto-organize'; strategy: LayoutStrategy; nodeIds?: string[] };
 
 interface WorkspaceState extends Workspace {
     // Transient flags (not persisted)
