@@ -661,7 +661,14 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         if (!container) return;
 
         const handleTouchStart = (e: Event) => {
-            const touch = (e as TouchEvent).touches[0];
+            const te = e as TouchEvent;
+            // Bail on multi-touch so pinch-zoom reaches ReactFlow's d3-zoom
+            // without a phantom long-press timer racing it.
+            if (te.touches.length > 1) {
+                clearLongPress();
+                return;
+            }
+            const touch = te.touches[0];
             if (!touch) return;
 
             const target = touch.target as HTMLElement;
