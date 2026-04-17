@@ -1365,3 +1365,16 @@ The following test cases verify fixes from the codebase audit (`SPATIAL_TASKS_CO
 | PT-8 | Touch: bottom sheet instead of chip bar | 1. On mobile/touch device, tap the "Blocked" badge on a blocked node | Bottom sheet slides up listing blockers with ≥44px tap targets |
 | PT-9 | Blocked state stays blocked after predecessor partial complete | 1. Mark some (not all) leaves of a container predecessor done 2. Click downstream node's blocker | Chip still lists the container with updated percentage |
 | PT-10 | Unblocked nodes show no badge | 1. Mark all predecessors done on a previously-blocked node | "Blocked" badge and lock icon disappear; status cycling works again |
+
+### Feature: Empty-Canvas Onboarding
+
+**What changed:** A brand-new user opening an empty root graph now sees ghost nodes, a CTA, shortcut hints, and a "Generate Flow with AI" option. Dismisses on Skip or on first node add.
+
+| # | Test Case | Steps | Expected Result |
+|---|-----------|-------|-----------------|
+| OB-1 | First-time user sees onboarding | 1. Clear localStorage 2. Create a new empty project | Ghost-node overlay + CTA + shortcut hints |
+| OB-2 | Skip persists | 1. Click Skip 2. Reload | No onboarding overlay |
+| OB-3 | Add-node dismisses | 1. On empty canvas, press N to add a task 2. Delete it | Onboarding does NOT return |
+| OB-4 | Empty container falls back | 1. Create a container on the root graph 2. Drill into it | The subtle empty-state hint appears, not the full onboarding |
+| OB-5 | AI CTA opens generator | 1. Click "Or: Generate Flow with AI" | FlowGenerator modal opens |
+| OB-6 | Touch variant | 1. On a touch device with empty root graph | Copy reads "Tap the + button to add your first task" |

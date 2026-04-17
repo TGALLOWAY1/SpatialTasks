@@ -108,6 +108,8 @@ export interface WorkspaceSettings {
     theme?: 'dark' | 'light';
     geminiApiKey?: string;
     geminiStatus?: GeminiConnectionStatus;
+    /** Once a user has seen (or dismissed) the empty-canvas onboarding, never show it again. */
+    hasSeenOnboarding?: boolean;
     [key: string]: any;
 }
 

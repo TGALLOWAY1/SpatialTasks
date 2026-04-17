@@ -20,13 +20,14 @@ import { ContextMenu, MenuItem } from '../UI/ContextMenu';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { ActionSheet } from '../UI/ActionSheet';
 import { FloatingActionButton } from '../UI/FloatingActionButton';
-import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Sparkles, Maximize2, Palette, Ban } from 'lucide-react';
+import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Maximize2, Palette, Ban } from 'lucide-react';
 import { ACCENT_COLORS, ACCENT_BAR, ACCENT_LABEL } from '../../utils/accent';
 import type { AccentColor } from '../../types';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 import { isNodeActionable, getBlockingNodes, BlockingNodeInfo } from '../../utils/logic';
 import { StepDetailPanel } from '../ExecutionPanel/StepDetailPanel';
 import { BlockedSpotlight, useBlockingTitles } from './BlockedSpotlight';
+import { EmptyCanvasOnboarding } from './EmptyCanvasOnboarding';
 
 const nodeTypes = {
     container: ContainerNode,
@@ -61,6 +62,8 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     const clearConnectMode = useWorkspaceStore(state => state.clearConnectMode);
     const setAutoEditNodeId = useWorkspaceStore(state => state.setAutoEditNodeId);
     const executionMode = useWorkspaceStore(state => state.executionMode);
+    const settings = useWorkspaceStore(state => state.settings);
+    const updateSettings = useWorkspaceStore(state => state.updateSettings);
 
     const reactFlowInstance = useReactFlow();
 
@@ -914,8 +917,17 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 )}
             </ReactFlow>
 
-            {/* Empty state guidance */}
-            {graph.nodes.length === 0 && !quickAdd && (
+            {/* Rich onboarding for brand-new users on an empty root graph. */}
+            {graph.nodes.length === 0 && !quickAdd && !settings.hasSeenOnboarding && navStack.length === 1 && (
+                <EmptyCanvasOnboarding
+                    isTouchDevice={isTouchDevice}
+                    onGenerateFlow={onGenerateFlow}
+                    onSkip={() => updateSettings({ hasSeenOnboarding: true })}
+                />
+            )}
+
+            {/* Subtler empty-state hint for everyone else (returning user, empty container, etc.). */}
+            {graph.nodes.length === 0 && !quickAdd && (settings.hasSeenOnboarding || navStack.length > 1) && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                     <div className="text-center space-y-3 max-w-xs">
                         <MousePointerClick className="w-10 h-10 text-gray-600 mx-auto" />
@@ -927,20 +939,6 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                                 ? 'Or long-press the canvas for more options'
                                 : 'Or right-click for more options like creating containers'}
                         </p>
-                        {!isTouchDevice && (
-                            <p className="text-gray-600 text-[11px]">
-                                Shortcuts: <kbd className="px-1 py-0.5 rounded bg-gray-800 border border-gray-700">N</kbd> task, <kbd className="px-1 py-0.5 rounded bg-gray-800 border border-gray-700">G</kbd> group, <kbd className="px-1 py-0.5 rounded bg-gray-800 border border-gray-700">Esc</kbd> clear
-                            </p>
-                        )}
-                        {onGenerateFlow && (
-                            <button
-                                onClick={onGenerateFlow}
-                                className="pointer-events-auto inline-flex items-center gap-2 px-4 py-2.5 mt-2 rounded-lg text-sm font-medium bg-purple-600/20 border border-purple-700/50 text-purple-300 hover:bg-purple-600/30 hover:text-purple-200 transition-colors"
-                            >
-                                <Sparkles className="w-4 h-4" />
-                                Generate Flow with AI
-                            </button>
-                        )}
                     </div>
                 </div>
             )}
