@@ -205,6 +205,16 @@ All shortcuts should only fire when the canvas has focus (not when typing in an 
 
 ---
 
+## 10b. Keyboard Shortcuts Cheatsheet
+
+- Pressing `?` (Shift+/) anywhere outside an input or textarea opens a modal listing every user-facing keyboard shortcut, grouped by category.
+- A "Keyboard shortcuts" link at the bottom of the sidebar opens the same modal (discoverability for touch/mouse users).
+- Shortcut labels swap `Cmd`/`Ctrl` based on the user's platform.
+- Modal dismissal: `Esc`, click-outside, or the × button.
+- Source of truth: `src/utils/shortcuts.ts`. Contributors adding new shortcuts MUST update that list.
+
+---
+
 ## 11. Status Cycling
 
 - **Click the status icon** (left side of an action node) → cycles through: Todo → In Progress → Done → Todo.

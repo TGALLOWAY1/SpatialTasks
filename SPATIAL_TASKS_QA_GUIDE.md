@@ -1321,3 +1321,18 @@ The following test cases verify fixes from the codebase audit (`SPATIAL_TASKS_CO
 | AF-13 | FlowGenerator loads on demand | 1. Click "Generate Flow" button | FlowGenerator chunk loads; modal opens correctly |
 | AF-14 | MarkdownImporter loads on demand | 1. Click "Import Plan" button | MarkdownImporter chunk loads; modal opens correctly |
 | AF-15 | Build produces multiple chunks | 1. Run `npm run build` | Output shows separate chunks for react-flow, supabase, and lazy-loaded modals |
+
+### Feature: Keyboard Shortcuts Cheatsheet
+
+**What changed:** Pressing `?` (Shift+/) opens a modal listing all user-facing keyboard shortcuts, grouped by category. Also accessible from the sidebar footer.
+
+| # | Test Case | Steps | Expected Result |
+|---|-----------|-------|-----------------|
+| KS-1 | Open via ? | 1. Focus the canvas 2. Press Shift+/ | Modal appears with 4 categories: Canvas, Selection, Edit, Focus View |
+| KS-2 | ? suppressed while typing | 1. Double-click a node to edit 2. Type "?" | No modal; character goes into input |
+| KS-3 | Close via Esc | 1. Open modal 2. Press Esc | Modal closes |
+| KS-4 | Close via click-outside | 1. Open modal 2. Click the dimmed backdrop | Modal closes |
+| KS-5 | Close via × button | 1. Open modal 2. Click × | Modal closes |
+| KS-6 | Open via sidebar | 1. Click "Keyboard shortcuts" in the sidebar footer | Modal opens |
+| KS-7 | Mac labels use ⌘ | On macOS, verify modifier labels show ⌘/⇧/⌥ | Keys render as macOS glyphs |
+| KS-8 | Windows labels use Ctrl | On Windows/Linux, verify labels use Ctrl/Shift/Alt | Keys render as Windows words |

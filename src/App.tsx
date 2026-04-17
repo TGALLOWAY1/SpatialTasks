@@ -6,6 +6,7 @@ import { ListView } from './components/ListView/ListView';
 import { FocusView } from './components/FocusView/FocusView';
 import { ToastContainer } from './components/UI/Toast';
 import { LoadingScreen } from './components/UI/LoadingScreen';
+import { ShortcutsModal } from './components/UI/ShortcutsModal';
 import { useWorkspaceStore } from './store/workspaceStore';
 import { useWorkspaceSync } from './hooks/useWorkspaceSync';
 
@@ -26,6 +27,7 @@ function App() {
     const viewMode = useWorkspaceStore(state => state.viewMode);
     const [showFlowGenerator, setShowFlowGenerator] = useState(false);
     const [showMarkdownImporter, setShowMarkdownImporter] = useState(false);
+    const [showShortcuts, setShowShortcuts] = useState(false);
 
     useEffect(() => {
         if (!activeProjectId && projects.length > 0) {
@@ -33,13 +35,35 @@ function App() {
         }
     }, [activeProjectId, projects, loadProject]);
 
+    // Global ? handler to open the cheatsheet (disabled while typing in inputs).
+    useEffect(() => {
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key !== '?') return;
+            const active = document.activeElement as HTMLElement | null;
+            const isTyping = !!active && (
+                active.tagName === 'INPUT' ||
+                active.tagName === 'TEXTAREA' ||
+                active.isContentEditable
+            );
+            if (isTyping) return;
+            e.preventDefault();
+            setShowShortcuts(true);
+        };
+        document.addEventListener('keydown', handleKey);
+        return () => document.removeEventListener('keydown', handleKey);
+    }, []);
+
     if (!supabaseLoaded) {
         return <LoadingScreen message="Loading your workspace..." />;
     }
 
     return (
         <div className="flex w-screen h-screen overflow-hidden bg-black text-white font-sans selection:bg-purple-500/30" style={{ paddingTop: 'var(--sat, 0px)' }}>
-            <Sidebar onGenerateFlow={() => setShowFlowGenerator(true)} onImportPlan={() => setShowMarkdownImporter(true)} />
+            <Sidebar
+                onGenerateFlow={() => setShowFlowGenerator(true)}
+                onImportPlan={() => setShowMarkdownImporter(true)}
+                onShowShortcuts={() => setShowShortcuts(true)}
+            />
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
                 <TopBar />
                 {viewMode === 'list'
@@ -53,6 +77,7 @@ function App() {
                 {showFlowGenerator && <FlowGenerator open={showFlowGenerator} onClose={() => setShowFlowGenerator(false)} />}
                 {showMarkdownImporter && <MarkdownImporter open={showMarkdownImporter} onClose={() => setShowMarkdownImporter(false)} />}
             </Suspense>
+            {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
         </div>
     );
 }
