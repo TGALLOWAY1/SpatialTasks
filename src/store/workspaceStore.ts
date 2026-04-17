@@ -10,7 +10,9 @@ export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
 export type CanvasAction =
     | { type: 'delete-selected' }
     | { type: 'fit-view' }
-    | { type: 'advance-next'; fromNodeId: string };
+    | { type: 'advance-next'; fromNodeId: string }
+    | { type: 'spotlight-blockers'; sourceNodeId: string; blockerIds: string[] }
+    | { type: 'select-and-frame'; nodeId: string };
 
 interface WorkspaceState extends Workspace {
     // Transient flags (not persisted)

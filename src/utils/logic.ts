@@ -15,25 +15,50 @@ function isDependencySatisfied(sourceNode: Node, graphs?: Record<string, Graph>)
 }
 
 /**
+ * Describes a predecessor that is currently blocking `node`.
+ * `reason` distinguishes a plain incomplete action from a partially-complete
+ * container so the UI can render them differently ("Container X (3/5 done)").
+ */
+export interface BlockingNodeInfo {
+    nodeId: string;
+    reason: 'incomplete' | 'partial-container';
+    progress?: number; // 0..1, only for partial-container
+}
+
+/**
+ * Returns every predecessor that currently blocks `node`. Empty array ≙ not blocked.
+ * Call sites that only need a boolean should use `isNodeBlocked`.
+ */
+export function getBlockingNodes(node: Node, graph: Graph, graphs?: Record<string, Graph>): BlockingNodeInfo[] {
+    if (!graph) return [];
+
+    const blockers: BlockingNodeInfo[] = [];
+    const incomingEdges = graph.edges.filter(e => e.target === node.id);
+
+    for (const edge of incomingEdges) {
+        const sourceNode = graph.nodes.find(n => n.id === edge.source);
+        if (!sourceNode) continue;
+        if (isDependencySatisfied(sourceNode, graphs)) continue;
+
+        if (sourceNode.type === 'container' && graphs) {
+            const progress = getContainerProgress(sourceNode, { graphs } as Workspace);
+            blockers.push({ nodeId: sourceNode.id, reason: 'partial-container', progress });
+        } else {
+            blockers.push({ nodeId: sourceNode.id, reason: 'incomplete' });
+        }
+    }
+
+    return blockers;
+}
+
+/**
  * Checks if a node is blocked by any incoming dependencies.
  * A node is blocked if it has any incoming edges from nodes that are not yet satisfied.
  *
  * @param graphs - Pass workspace `graphs` so container predecessors can be evaluated by child progress.
  */
 export function isNodeBlocked(node: Node, graph: Graph, graphs?: Record<string, Graph>): boolean {
-    if (!graph) return false;
-
-    const incomingEdges = graph.edges.filter(e => e.target === node.id);
-
-    for (const edge of incomingEdges) {
-        const sourceNode = graph.nodes.find(n => n.id === edge.source);
-
-        if (sourceNode && !isDependencySatisfied(sourceNode, graphs)) {
-            return true;
-        }
-    }
-
-    return false;
+    return getBlockingNodes(node, graph, graphs).length > 0;
 }
 
 /**

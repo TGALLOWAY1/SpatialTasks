@@ -1321,3 +1321,20 @@ The following test cases verify fixes from the codebase audit (`SPATIAL_TASKS_CO
 | AF-13 | FlowGenerator loads on demand | 1. Click "Generate Flow" button | FlowGenerator chunk loads; modal opens correctly |
 | AF-14 | MarkdownImporter loads on demand | 1. Click "Import Plan" button | MarkdownImporter chunk loads; modal opens correctly |
 | AF-15 | Build produces multiple chunks | 1. Run `npm run build` | Output shows separate chunks for react-flow, supabase, and lazy-loaded modals |
+
+### Feature: Predecessor Trace ("Why is this blocked?")
+
+**What changed:** Clicking the lock icon or "Blocked" badge on a blocked node now surfaces which predecessors are blocking it with red pulse rings, a fitView, and a chip bar / bottom sheet listing the blockers by title.
+
+| # | Test Case | Steps | Expected Result |
+|---|-----------|-------|-----------------|
+| PT-1 | Single blocker (action) | 1. Open Morning Flow System → Breakfast subgraph 2. Click the lock icon on "Eat" | Cook gets a red pulse ring; viewport fits Eat + Cook; chip bar "Blocked by Cook" appears under Eat |
+| PT-2 | Container blocker shows progress | 1. On root graph, click the "Blocked" badge on Breakfast | Workout pulses; chip shows "Blocked by Workout (25%)" |
+| PT-3 | Chain of 3 blockers | 1. Build a graph A → B → C → D where A is todo 2. Click lock on D | Only C appears as a blocker (direct predecessor only); clicking C's chip frames C, which can itself be opened to reveal B |
+| PT-4 | Dismiss via Esc | 1. Trigger a blocker spotlight 2. Press Esc | Chip bar/bottom sheet closes; pulse rings stop |
+| PT-5 | Dismiss by clicking empty canvas | 1. Trigger spotlight 2. Click empty canvas pane | Chip bar closes; spotlight clears |
+| PT-6 | Auto-dismiss after 4s | 1. Trigger spotlight 2. Do nothing for 4+ seconds | Chip bar disappears; pulse rings fade |
+| PT-7 | Chip click jumps to blocker | 1. Trigger spotlight on Eat 2. Click the "Cook" chip | Spotlight closes; viewport re-frames Cook |
+| PT-8 | Touch: bottom sheet instead of chip bar | 1. On mobile/touch device, tap the "Blocked" badge on a blocked node | Bottom sheet slides up listing blockers with ≥44px tap targets |
+| PT-9 | Blocked state stays blocked after predecessor partial complete | 1. Mark some (not all) leaves of a container predecessor done 2. Click downstream node's blocker | Chip still lists the container with updated percentage |
+| PT-10 | Unblocked nodes show no badge | 1. Mark all predecessors done on a previously-blocked node | "Blocked" badge and lock icon disappear; status cycling works again |
