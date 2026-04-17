@@ -11,6 +11,7 @@ import ReactFlow, {
     ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { clsx } from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { ContainerNode } from '../Nodes/ContainerNode';
@@ -19,10 +20,13 @@ import { ContextMenu, MenuItem } from '../UI/ContextMenu';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { ActionSheet } from '../UI/ActionSheet';
 import { FloatingActionButton } from '../UI/FloatingActionButton';
-import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Sparkles, Maximize2 } from 'lucide-react';
+import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Sparkles, Maximize2, Palette, Ban } from 'lucide-react';
+import { ACCENT_COLORS, ACCENT_BAR, ACCENT_LABEL } from '../../utils/accent';
+import type { AccentColor } from '../../types';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
-import { isNodeActionable } from '../../utils/logic';
+import { isNodeActionable, getBlockingNodes, BlockingNodeInfo } from '../../utils/logic';
 import { StepDetailPanel } from '../ExecutionPanel/StepDetailPanel';
+import { BlockedSpotlight, useBlockingTitles } from './BlockedSpotlight';
 
 const nodeTypes = {
     container: ContainerNode,
@@ -48,6 +52,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     const addEdge = useWorkspaceStore(state => state.addEdge);
     const addNode = useWorkspaceStore(state => state.addNode);
     const batchUpdateNodes = useWorkspaceStore(state => state.batchUpdateNodes);
+    const setNodeColor = useWorkspaceStore(state => state.setNodeColor);
     const batchUpdatePositions = useWorkspaceStore(state => state.batchUpdatePositions);
     const selectMode = useWorkspaceStore(state => state.selectMode);
     const setHasSelection = useWorkspaceStore(state => state.setHasSelection);
@@ -85,6 +90,13 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         message: string;
         onConfirm: () => void;
     } | null>(null);
+
+    // Blocked-by spotlight state (transient UI state, not persisted)
+    const [spotlight, setSpotlight] = useState<{
+        sourceNodeId: string;
+        blockers: BlockingNodeInfo[];
+    } | null>(null);
+    const spotlightTitles = useBlockingTitles(spotlight?.blockers ?? []);
 
     const graph = activeGraphId ? graphs[activeGraphId] : null;
 
@@ -410,6 +422,42 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
             deleteSelected();
         } else if (action.type === 'fit-view') {
             handleFitView();
+        } else if (action.type === 'spotlight-blockers') {
+            if (!activeGraphId) return;
+            const currentGraph = useWorkspaceStore.getState().graphs[activeGraphId];
+            if (!currentGraph) return;
+            const allGraphs = useWorkspaceStore.getState().graphs;
+            const sourceNode = currentGraph.nodes.find(n => n.id === action.sourceNodeId);
+            if (!sourceNode) return;
+            const freshBlockers = getBlockingNodes(sourceNode, currentGraph, allGraphs);
+            if (freshBlockers.length === 0) return;
+
+            setSpotlight({ sourceNodeId: action.sourceNodeId, blockers: freshBlockers });
+
+            // Fit view to include the source + its blockers.
+            const idsToFit = [action.sourceNodeId, ...freshBlockers.map(b => b.nodeId)];
+            const rfNodes = reactFlowInstance.getNodes();
+            const nodesToFit = rfNodes.filter(n => idsToFit.includes(n.id));
+            if (nodesToFit.length > 0) {
+                reactFlowInstance.fitView({
+                    nodes: nodesToFit,
+                    padding: 0.3,
+                    duration: 400,
+                    maxZoom: 1.5,
+                });
+            }
+        } else if (action.type === 'select-and-frame') {
+            const rfNodes = reactFlowInstance.getNodes();
+            const rfNode = rfNodes.find(n => n.id === action.nodeId);
+            if (!rfNode) return;
+            reactFlowInstance.setNodes(rfNodes.map(n => ({ ...n, selected: n.id === action.nodeId })));
+            setHasSelection(true);
+            reactFlowInstance.fitView({
+                nodes: [rfNode],
+                padding: 0.4,
+                duration: 300,
+                maxZoom: 1.5,
+            });
         } else if (action.type === 'advance-next') {
             const fromNodeId = action.fromNodeId;
             if (!activeGraphId) return;
@@ -657,6 +705,18 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
             }];
         }
 
+        const colorSwatch = (c: AccentColor) => (
+            <span className={clsx("inline-block w-3 h-3 rounded-full", ACCENT_BAR[c])} aria-hidden="true" />
+        );
+        const colorSubmenuFor = (apply: (c: AccentColor | null) => void): MenuItem[] => [
+            { label: 'No color', icon: <Ban className="w-4 h-4" />, onClick: () => apply(null) },
+            ...ACCENT_COLORS.map(c => ({
+                label: ACCENT_LABEL[c],
+                icon: colorSwatch(c),
+                onClick: () => apply(c),
+            })),
+        ];
+
         if (target.nodeId) {
             // Multi-select handling (desktop context menu only)
             if (opts?.multiSelect) {
@@ -670,6 +730,14 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                             { label: 'In Progress', icon: <Clock className="w-4 h-4" />, onClick: () => batchUpdateNodes(nodeIds, { status: 'in_progress' }) },
                             { label: 'Done', icon: <CheckCircle2 className="w-4 h-4" />, onClick: () => batchUpdateNodes(nodeIds, { status: 'done' }) },
                         ],
+                        onClick: () => {},
+                    },
+                    {
+                        label: `Set Color (${selectedNodes.length} nodes)`,
+                        icon: <Palette className="w-4 h-4" />,
+                        submenu: colorSubmenuFor((c) => {
+                            nodeIds.forEach(id => setNodeColor(id, c));
+                        }),
                         onClick: () => {},
                     },
                     {
@@ -701,6 +769,12 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                     onClick: () => {},
                 });
             }
+            items.push({
+                label: 'Set Color',
+                icon: <Palette className="w-4 h-4" />,
+                submenu: colorSubmenuFor((c) => setNodeColor(target.nodeId!, c)),
+                onClick: () => {},
+            });
             items.push({
                 label: 'Delete',
                 icon: <Trash2 className="w-4 h-4" />,
@@ -761,7 +835,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 },
             },
         ];
-    }, [activeGraphId, graph, reactFlowInstance, removeEdge, removeNode, removeNodes, updateNode, batchUpdateNodes, addNode, setAutoEditNodeId]);
+    }, [activeGraphId, graph, reactFlowInstance, removeEdge, removeNode, removeNodes, updateNode, batchUpdateNodes, setNodeColor, addNode, setAutoEditNodeId]);
 
     const buildActionSheetItems = useCallback((): MenuItem[] => {
         if (!actionSheet) return [];
@@ -805,7 +879,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 onNodesChange={onNodesChange}
                 onConnect={onConnect}
                 onNodeClick={handleNodeClick}
-                onPaneClick={() => { setQuickAdd(null); setContextMenu(null); setActionSheet(null); if (connectMode.active) clearConnectMode(); }}
+                onPaneClick={() => { setQuickAdd(null); setContextMenu(null); setActionSheet(null); setSpotlight(null); if (connectMode.active) clearConnectMode(); }}
                 onDoubleClick={isTouchDevice ? undefined : handlePaneDoubleClick}
                 onNodeContextMenu={handleNodeContextMenu}
                 onEdgeContextMenu={handleEdgeContextMenu}
@@ -953,6 +1027,21 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
 
             {/* Execution mode step detail panel */}
             <StepDetailPanel />
+
+            {/* Predecessor Trace — blocked-by spotlight */}
+            {spotlight && (
+                <BlockedSpotlight
+                    sourceNodeId={spotlight.sourceNodeId}
+                    blockers={spotlight.blockers}
+                    titles={spotlightTitles}
+                    isSmallScreen={isTouchDevice}
+                    onDismiss={() => setSpotlight(null)}
+                    onJumpTo={(blockerId) => {
+                        setSpotlight(null);
+                        useWorkspaceStore.getState().dispatchCanvasAction({ type: 'select-and-frame', nodeId: blockerId });
+                    }}
+                />
+            )}
         </div>
     );
 };

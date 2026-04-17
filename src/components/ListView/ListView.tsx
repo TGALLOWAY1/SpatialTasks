@@ -11,6 +11,18 @@ import { v4 as uuidv4 } from 'uuid';
 import { magicExpand, GeminiError } from '../../services/gemini';
 import { useToastStore } from '../UI/Toast';
 import { ConfirmModal } from '../UI/ConfirmModal';
+import { ACCENT_DOT } from '../../utils/accent';
+
+const AccentDot = ({ node }: { node: Node }) => {
+    const color = node.meta?.color;
+    if (!color) return null;
+    return (
+        <span
+            aria-hidden="true"
+            className={clsx('inline-block w-2 h-2 rounded-full flex-shrink-0', ACCENT_DOT[color])}
+        />
+    );
+};
 
 const StatusIcon = ({ status, blocked, size = 'sm' }: { status?: string; blocked?: boolean; size?: 'sm' | 'md' }) => {
     const cls = size === 'md' ? 'w-5 h-5' : 'w-4 h-4';
@@ -134,6 +146,8 @@ const ActionItem: React.FC<{ node: Node; blocked: boolean; depth: number; isPara
             >
                 <StatusIcon status={node.status} blocked={blocked} size="md" />
             </button>
+
+            <AccentDot node={node} />
 
             {editing ? (
                 <input
@@ -317,6 +331,8 @@ const ContainerItem: React.FC<{
                 )}
 
                 <Layers className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+
+                <AccentDot node={node} />
 
                 <div className="flex-1 min-w-0">
                     {editing ? (

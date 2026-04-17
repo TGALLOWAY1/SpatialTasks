@@ -1336,3 +1336,32 @@ The following test cases verify fixes from the codebase audit (`SPATIAL_TASKS_CO
 | KS-6 | Open via sidebar | 1. Click "Keyboard shortcuts" in the sidebar footer | Modal opens |
 | KS-7 | Mac labels use ⌘ | On macOS, verify modifier labels show ⌘/⇧/⌥ | Keys render as macOS glyphs |
 | KS-8 | Windows labels use Ctrl | On Windows/Linux, verify labels use Ctrl/Shift/Alt | Keys render as Windows words |
+### Feature: Node Accent Colors
+
+**What changed:** Nodes can be tagged with one of 7 accent colors via context menu / action sheet. Accent renders as a 3px left-edge bar in graph view and an 8px dot in list view.
+
+| # | Test Case | Steps | Expected Result |
+|---|-----------|-------|-----------------|
+| AC-1 | Set color on a single node | 1. Right-click a node 2. Set Color → Red | Red 3px bar appears on the node's left edge in graph view |
+| AC-2 | Clear color | 1. On a colored node, Set Color → No color | Bar disappears; node returns to default appearance |
+| AC-3 | Color persists in list view | 1. Color a node red 2. Switch to list view | Red dot next to title |
+| AC-4 | Batch color via multi-select | 1. Select 3+ nodes (Shift-click) 2. Right-click → Set Color → Blue | All selected nodes show blue bar; single undo reverts all |
+| AC-5 | Persist across reload | 1. Color a node, reload | Color still applied |
+| AC-6 | Undo restores previous color | 1. Color node red 2. Change to blue 3. Undo | Node is red again |
+| AC-7 | Touch: action sheet color picker | 1. Long-press a node on touch 2. Set Color → Green | Green accent applied |
+### Feature: Predecessor Trace ("Why is this blocked?")
+
+**What changed:** Clicking the lock icon or "Blocked" badge on a blocked node now surfaces which predecessors are blocking it with red pulse rings, a fitView, and a chip bar / bottom sheet listing the blockers by title.
+
+| # | Test Case | Steps | Expected Result |
+|---|-----------|-------|-----------------|
+| PT-1 | Single blocker (action) | 1. Open Morning Flow System → Breakfast subgraph 2. Click the lock icon on "Eat" | Cook gets a red pulse ring; viewport fits Eat + Cook; chip bar "Blocked by Cook" appears under Eat |
+| PT-2 | Container blocker shows progress | 1. On root graph, click the "Blocked" badge on Breakfast | Workout pulses; chip shows "Blocked by Workout (25%)" |
+| PT-3 | Chain of 3 blockers | 1. Build a graph A → B → C → D where A is todo 2. Click lock on D | Only C appears as a blocker (direct predecessor only); clicking C's chip frames C, which can itself be opened to reveal B |
+| PT-4 | Dismiss via Esc | 1. Trigger a blocker spotlight 2. Press Esc | Chip bar/bottom sheet closes; pulse rings stop |
+| PT-5 | Dismiss by clicking empty canvas | 1. Trigger spotlight 2. Click empty canvas pane | Chip bar closes; spotlight clears |
+| PT-6 | Auto-dismiss after 4s | 1. Trigger spotlight 2. Do nothing for 4+ seconds | Chip bar disappears; pulse rings fade |
+| PT-7 | Chip click jumps to blocker | 1. Trigger spotlight on Eat 2. Click the "Cook" chip | Spotlight closes; viewport re-frames Cook |
+| PT-8 | Touch: bottom sheet instead of chip bar | 1. On mobile/touch device, tap the "Blocked" badge on a blocked node | Bottom sheet slides up listing blockers with ≥44px tap targets |
+| PT-9 | Blocked state stays blocked after predecessor partial complete | 1. Mark some (not all) leaves of a container predecessor done 2. Click downstream node's blocker | Chip still lists the container with updated percentage |
+| PT-10 | Unblocked nodes show no badge | 1. Mark all predecessors done on a previously-blocked node | "Blocked" badge and lock icon disappear; status cycling works again |

@@ -212,6 +212,14 @@ All shortcuts should only fire when the canvas has focus (not when typing in an 
 - Shortcut labels swap `Cmd`/`Ctrl` based on the user's platform.
 - Modal dismissal: `Esc`, click-outside, or the × button.
 - Source of truth: `src/utils/shortcuts.ts`. Contributors adding new shortcuts MUST update that list.
+## 10a. Accent Colors
+
+- Every node can be tagged with one of 7 accent colors (gray, red, amber, green, blue, purple, pink) or left uncolored. The accent has **no semantic meaning** — no filtering, no dependency behavior. It is a purely visual categorization tool.
+- Accent is set via the node's context menu (desktop right-click) or action sheet (touch long-press): **Set Color → [swatch row]**. The "No color" option clears the accent.
+- Multi-select context menu also offers a batch "Set Color" submenu that applies to every selected node in a single undo step.
+- **Graph view**: the accent renders as a 3px left-edge bar inside the node card. Nodes without an accent are visually identical to pre-feature.
+- **List view**: the accent renders as an 8px dot next to the title.
+- Accent persists through Zustand `persist` (localStorage) and Supabase sync, and is undo/redo-tracked.
 
 ---
 
@@ -219,9 +227,21 @@ All shortcuts should only fire when the canvas has focus (not when typing in an 
 
 - **Click the status icon** (left side of an action node) → cycles through: Todo → In Progress → Done → Todo.
 - The status icon should update immediately with appropriate visual feedback (icon change, color change).
-- **Blocked nodes** (those with unsatisfied dependencies) should show a lock icon and should NOT allow status changes. The cursor should indicate the interaction is disabled.
+- **Blocked nodes** (those with unsatisfied dependencies) show a lock icon in place of the status circle. Clicking the lock does NOT cycle status — it surfaces the blockers (see §11a).
 - Cycling status should be a single-click action — no menus or extra steps.
 - Status can also be set via right-click context menu → Set Status submenu, which allows jumping directly to any status.
+
+## 11a. Blocked Node Interaction ("Why is this blocked?")
+
+- Every node with unsatisfied predecessors shows a red **"Blocked"** badge on its top-right corner in addition to the lock on the status icon.
+- **Clicking the lock icon OR the "Blocked" badge** on a blocked node opens the **predecessor trace**:
+  - Each blocking predecessor gets a red pulse ring (2 cycles, ~2.4s) overlayed on its node.
+  - The viewport auto-fits to include the blocked node and its blockers (400ms animation).
+  - A chip bar anchored under the blocked node lists each blocker: `Blocked by <Title>`. Container blockers show progress: `<Title> (42%)`.
+  - On small/touch screens, the chip bar is replaced by a bottom sheet with 44×44 tap targets.
+- **Clicking a blocker chip/row** dismisses the spotlight and frames the blocker on screen (and selects it when possible).
+- **Dismissal**: Esc, clicking empty canvas, the × button on the chip bar, or after a 4-second timeout.
+- Blocker resolution is refreshed on each open — stale blockers won't be shown.
 
 ---
 

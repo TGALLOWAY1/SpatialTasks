@@ -8,10 +8,11 @@ import { clsx } from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useToastStore } from '../UI/Toast';
-import { getContainerProgress, isNodeBlocked } from '../../utils/logic';
+import { getContainerProgress, getBlockingNodes } from '../../utils/logic';
 import { magicExpand, GeminiError } from '../../services/gemini';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
+import { ACCENT_BAR } from '../../utils/accent';
 
 const WIDTH = 200;
 const HEIGHT = 80;
@@ -42,6 +43,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
     const updateSettings = useWorkspaceStore(state => state.updateSettings);
     const autoEditNodeId = useWorkspaceStore(state => state.autoEditNodeId);
     const setAutoEditNodeId = useWorkspaceStore(state => state.setAutoEditNodeId);
+    const dispatchCanvasAction = useWorkspaceStore(state => state.dispatchCanvasAction);
     const addToast = useToastStore(state => state.addToast);
 
     const [expanding, setExpanding] = useState(false);
@@ -69,12 +71,17 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
         return getContainerProgress(data, { graphs } as any);
     }, [data, graphs]);
 
-    const isActionable = useMemo(() => {
+    const blockers = useMemo(() => {
         const graphId = activeGraphId ?? data.graphId;
         const graph = graphId ? graphs[graphId] : undefined;
-        const blocked = graph ? isNodeBlocked(data, graph, graphs) : false;
-        return !blocked && progress < 1;
-    }, [data, activeGraphId, graphs, progress]);
+        return graph ? getBlockingNodes(data, graph, graphs) : [];
+    }, [data, activeGraphId, graphs]);
+
+    const isBlocked = blockers.length > 0;
+
+    const isActionable = useMemo(() => {
+        return !isBlocked && progress < 1;
+    }, [isBlocked, progress]);
 
     const highlight = executionMode && isActionable;
     const dim = executionMode && !isActionable;
@@ -278,6 +285,16 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
 
             <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-indigo-400 !top-1/2 !-translate-y-1/2" />
 
+            {data.meta?.color && (
+                <div
+                    aria-hidden="true"
+                    className={clsx(
+                        "absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg",
+                        ACCENT_BAR[data.meta.color]
+                    )}
+                />
+            )}
+
             <div className="flex flex-col gap-2">
                 <div className="flex items-start justify-between border-b border-indigo-800 pb-2 mb-1">
                     <div className="flex items-start gap-2 overflow-hidden flex-1 min-w-0">
@@ -346,6 +363,24 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
                 >
                     <ArrowBigRightDash className="w-3 h-3" />
                     Dive In
+                </button>
+            )}
+
+            {isBlocked && !highlight && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        dispatchCanvasAction({
+                            type: 'spotlight-blockers',
+                            sourceNodeId: data.id,
+                            blockerIds: blockers.map(b => b.nodeId),
+                        });
+                    }}
+                    className="absolute -top-2 -right-2 bg-red-900/80 text-red-200 text-[10px] px-1.5 py-0.5 rounded-full border border-red-800 hover:bg-red-800 hover:text-red-100 transition-colors z-20 touch:min-h-[28px]"
+                    title={`Blocked by ${blockers.length} predecessor${blockers.length === 1 ? '' : 's'}`}
+                    aria-label="Show blockers"
+                >
+                    Blocked
                 </button>
             )}
 
