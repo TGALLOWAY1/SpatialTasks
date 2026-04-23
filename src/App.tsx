@@ -81,7 +81,13 @@ function App() {
             <ToastContainer />
             <Suspense fallback={null}>
                 {showFlowGenerator && <FlowGenerator open={showFlowGenerator} onClose={() => setShowFlowGenerator(false)} />}
-                {showMarkdownImporter && <MarkdownImporter open={showMarkdownImporter} onClose={() => setShowMarkdownImporter(false)} />}
+                {showMarkdownImporter && (
+                    <MarkdownImporter
+                        open={showMarkdownImporter}
+                        onClose={() => setShowMarkdownImporter(false)}
+                        onLaunchGenerator={() => setShowFlowGenerator(true)}
+                    />
+                )}
             </Suspense>
             {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
         </div>
