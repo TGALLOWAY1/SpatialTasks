@@ -76,6 +76,16 @@ export interface Project {
     rootGraphId: string;
     createdAt: string;
     updatedAt: string;
+    folderId?: string;
+}
+
+export interface Folder {
+    id: string;
+    title: string;
+    collapsed: boolean;
+    order: number;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export type GeminiConnectionStatus = 'no_key' | 'configured' | 'error';
@@ -115,6 +125,7 @@ export interface WorkspaceSettings {
 export interface Workspace {
     version: number;
     projects: Project[];
+    folders: Folder[];
     activeProjectId: string | null;
     activeGraphId: string | null;
     // Navigation stack: array of { graphId, title } or just graphIds to build breadcrumbs

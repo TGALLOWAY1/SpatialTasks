@@ -48,7 +48,7 @@ No URL router — single-page app with in-memory navigation stack.
 | Component | File | Purpose |
 |-----------|------|---------|
 | TopBar | `src/components/Layout/TopBar.tsx` | Breadcrumbs, undo/redo, view toggle, execution toggle |
-| Sidebar | `src/components/Layout/Sidebar.tsx` | Projects, settings, API key, sign out |
+| Sidebar | `src/components/Layout/Sidebar.tsx` | Projects, **project folders (create/rename/delete, collapse/expand, drag-and-drop on desktop, mobile move-to action sheet)**, settings, API key, sign out |
 
 ### UI Widgets
 | Component | File | Purpose |
@@ -57,6 +57,7 @@ No URL router — single-page app with in-memory navigation stack.
 | ContextMenu | `src/components/UI/ContextMenu.tsx` | Desktop right-click menus |
 | ActionSheet | `src/components/UI/ActionSheet.tsx` | Mobile bottom-sheet menus |
 | ConfirmModal | `src/components/UI/ConfirmModal.tsx` | Destructive action confirmation |
+| FolderDeleteModal | `src/components/UI/FolderDeleteModal.tsx` | Three-button modal for deleting a non-empty project folder (Cancel / Keep projects / Delete projects too) |
 | FloatingActionButton | `src/components/UI/FloatingActionButton.tsx` | Mobile FAB + bottom-sheet input |
 | SaveIndicator | `src/components/UI/SaveIndicator.tsx` | Save status (Saving.../Saved) |
 | ErrorBoundary | `src/components/UI/ErrorBoundary.tsx` | React error boundary |
@@ -97,8 +98,9 @@ No URL router — single-page app with in-memory navigation stack.
 
 | Entity | Key Fields | Notes |
 |--------|-----------|-------|
-| Workspace | version, projects[], graphs{}, navStack[], settings | Root data object |
-| Project | id, title, rootGraphId, createdAt, updatedAt | Top-level container |
+| Workspace | version, projects[], folders[], graphs{}, navStack[], settings | Root data object; `version: 2` since folders introduction |
+| Project | id, title, rootGraphId, createdAt, updatedAt, folderId? | Top-level container; `folderId` undefined means project sits at the root of the sidebar |
+| Folder | id, title, collapsed, order, createdAt, updatedAt | Sidebar-only grouping for projects; flat (one level); `collapsed` persisted; `order` controls sort |
 | Graph | id, projectId, title, nodes[], edges[], viewport? | Canvas content |
 | Node | id, graphId, type, title, x, y, status?, childGraphId?, meta? | action or container; `meta.images[]` holds image attachments, `meta.imagesOpen` persists the Visual References toggle |
 | ImageAttachment | id, dataUrl, name?, mimeType?, addedAt | Base64-encoded image stored under `node.meta.images[]` (V1) |
@@ -109,9 +111,14 @@ No URL router — single-page app with in-memory navigation stack.
 
 | Operation | Store Method | Side Effects |
 |-----------|-------------|-------------|
-| Create project | `createProject(title)` | Creates root graph, sets active |
+| Create project | `createProject(title, folderId?)` | Creates root graph, sets active; optional `folderId` nests the new project inside a folder |
 | Rename project | `renameProject(id, title)` | Updates timestamp |
 | Delete project | `deleteProject(id)` | Removes all graphs; blocks if last project |
+| Create folder | `createFolder(title)` | Appends a new folder to the workspace; returns new id; expanded by default |
+| Rename folder | `renameFolder(id, title)` | Trims title; empty string is a no-op |
+| Toggle folder collapsed | `toggleFolderCollapsed(id)` | Flips `collapsed`; persisted across reloads |
+| Move project to folder | `moveProjectToFolder(projectId, folderId \| null)` | Updates project's `folderId`; `null` moves to root (Ungrouped); no-op if already in target |
+| Delete folder | `deleteFolder(id, { deleteProjects })` | Either moves inner projects to root (Keep) or cascades deletion of projects + descendant graphs (Delete Too); Delete Too is blocked if it would empty the workspace |
 | Add node | `addNode(node)` | Adds to active graph; sets `autoEditNodeId` for keyboard/context-menu creation |
 | Update node | `updateNode(id, data)` | Partial update |
 | Remove node | `removeNode(id)` | Removes edges + child graphs recursively |
@@ -128,8 +135,8 @@ No URL router — single-page app with in-memory navigation stack.
 
 ## Persistence Pipeline
 
-1. **localStorage** — Zustand persist middleware, key `spatialtasks-workspace`
-2. **Supabase** — Debounced (2s) upsert to `workspaces` table on every mutation
+1. **localStorage** — Zustand persist middleware, key `spatialtasks-workspace`, current version `2`. A `migrate(persistedState, fromVersion)` hook in the store injects `folders: []` and normalizes `project.folderId` for any v<2 blob.
+2. **Supabase** — Debounced (2s) upsert to `workspaces` table on every mutation. Schema is a single JSONB column, so no server migration is needed; `hydrateFromSupabase` self-heals missing `folders` on load.
 3. **Gemini keys** — Isolated in localStorage key `spatialtasks-gemini-config`, never sent to Supabase
 
 ### Hydration Order
@@ -222,6 +229,7 @@ No URL router — single-page app with in-memory navigation stack.
 | Auto-Organize Canvas feature | `src/layout/*`, `src/components/Canvas/LayoutMenu.tsx`, `CanvasArea.tsx`, `TopBar.tsx`, `workspaceStore.ts`, `types/index.ts` | New `src/layout/` engine (cluster/grid/hierarchy/flow strategies + overlap resolver + centroid-preserve); toolbar popover (desktop) + overflow-menu entries (touch); pane context-menu submenu; undo via `batchUpdatePositions` single commit; last-used strategy persisted via `settings.preferredLayoutStrategy` |
 | Code splitting / lazy loading | `App.tsx`, `vite.config.ts` | Bundle size, lazy modal loading, chunk splitting |
 | Focus View mode | `workspaceStore.ts`, `logic.ts`, `TopBar.tsx`, `App.tsx`, `FocusView.tsx`, `ParallelChooser.tsx` | Single-task focus mode with image/notes/status, auto-advance, parallel chooser, container drill-in, edit modal |
+| Project Folders (grouping) | `types/index.ts`, `workspaceStore.ts`, `utils/generator.ts`, `components/Layout/Sidebar.tsx`, `components/UI/FolderDeleteModal.tsx` | Flat (one-level) folders for grouping projects in the sidebar. Covers folder CRUD, collapse/expand persisted state, HTML5 drag-and-drop of projects onto folder headers on desktop, touch fallback (tap ⋯ → "Move to folder…" action sheet), three-button delete modal (Cancel / Keep projects / Delete projects too), v1→v2 migration, zundo tracking of `folders`, and self-healing of Supabase v1 blobs. |
 
 ## Related Documents
 

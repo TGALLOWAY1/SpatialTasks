@@ -283,8 +283,9 @@ export function generateWorkspace(seed: string = '42'): Workspace {
     const activeGraphId = p1Root;
 
     return {
-        version: 1,
+        version: 2,
         projects,
+        folders: [],
         graphs: ctx.graphs,
         activeProjectId,
         activeGraphId,

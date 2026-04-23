@@ -334,6 +334,35 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 
 ---
 
+### Flow 13b: Project Folders (Grouping)
+
+**What the user is doing**: Organizing projects into folders (e.g. a "Music" folder) so the sidebar is browsable with many projects. Folders are flat (one level), live in the sidebar only, and never appear in the in-project breadcrumb.
+
+**Happy path**:
+1. Click the folder+ icon (next to the project+ icon) → inline folder-name input appears → type name, press Enter → folder appears below "Ungrouped" list.
+2. Double-click a folder title → inline rename → Enter to save.
+3. Click the chevron (or the folder title) → folder expands/collapses. State persists across reloads.
+4. Desktop: drag a project row onto a folder header → purple drop-highlight while hovering → release → project nests inside. Drag a nested project back onto the "Ungrouped" section → returns to root.
+5. Click the "+" button on a folder header → inline "New project" form opens inside that folder → newly created project inherits the folder.
+6. Hover a folder, click trash:
+   - Empty folder → single-button confirm modal.
+   - Folder with projects → three-button modal: **Cancel** / **Keep projects** (moves them to Ungrouped) / **Delete projects too** (cascades deletion).
+7. Mobile: drag disabled. Tap the "⋯" button on a project row → action sheet with **Rename**, **Move to folder…**, **Delete**. Picking "Move to folder…" lists Ungrouped, each folder, and a "New folder…" shortcut.
+8. Cmd/Ctrl+Z undoes folder create, rename, move, and delete.
+
+**What could go wrong**:
+- Legacy (v1) workspace without a `folders` array breaks on load — migration must inject `folders: []` so the UI renders normally.
+- "Delete projects too" on a folder that contains every project in the workspace — must be blocked with a toast, never auto-create a replacement blank.
+- Active project is inside the deleted folder — active selection must fall back to first remaining project (same behavior as single-project delete).
+- Drop event fires twice (nested drop targets) — project ends up in the wrong folder.
+- Touch long-press triggers native browser drag or context menu instead of the action sheet.
+- Collapse state lost on reload (means persistence wasn't wired through).
+- Supabase sync: folder created on device A doesn't appear on device B after reload.
+
+**Why it matters**: As users accumulate projects across life domains (music, work, hobbies), a flat list becomes unusable. This is the primary organizational affordance at the project level.
+
+---
+
 ### Flow 14: View Mode Switching (Graph ↔ List ↔ Focus)
 
 **What the user is doing**: Toggling between canvas, list, and focus views.
@@ -576,7 +605,7 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 | QA-B042 | Focus view | View toggle hidden but reachable on small screens | Mobile/small viewport (< sm breakpoint) | 1. Open the TopBar overflow menu (kebab/MoreVertical icon). | The overflow menu lists Node View, List View, AND Focus View options, each with the active state highlighted when current. | Tapping switches view mode and closes the menu; new Focus button must not be left out of mobile UX | P0 |
 | QA-B043 | Focus view | Desktop keyboard shortcuts | Focus View on desktop with one task showing | 1. Press Space. 2. Press Space again. 3. Press → key. 4. Press ← key. 5. Press Esc. | Space/Enter cycles status (and may auto-advance); → triggers Skip; ← triggers Prev; Esc switches viewMode back to 'list'. | Shortcuts must NOT fire while typing in the Edit modal's textarea; should be inert on touch devices | P2 |
 
-### Group C: Projects, Persistence & AI (21 cases)
+### Group C: Projects, Persistence & AI (33 cases)
 
 | Test ID | Area | Scenario | Preconditions | Steps | Expected Result | Watch For | Priority |
 |---------|------|----------|---------------|-------|----------------|-----------|----------|
@@ -601,6 +630,18 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 | QA-C019 | Markdown Import | Import empty or malformed markdown | App loaded | 1. Open MarkdownImporter 2. Paste empty string or random non-markdown text 3. Confirm import | Graceful handling — either an error toast saying invalid input or a minimal project with a single node from the text | Should not crash or produce an empty project with zero nodes | P2 |
 | QA-C020 | JSON Import | Import valid workspace JSON | App loaded, have a previously exported JSON file | 1. Open JSON import option 2. Select a valid workspace JSON file 3. Confirm import | Workspace fully replaced with imported data — all nodes, edges, positions, and project structure match the JSON | SaveIndicator should trigger a save after import; previous workspace is gone (warn user beforehand) | P1 |
 | QA-C021 | JSON Import | Import invalid JSON file | App loaded | 1. Open JSON import 2. Select a file with invalid JSON or wrong schema 3. Confirm import | Validation fails; error toast displayed; workspace remains unchanged | Should validate schema structure, not just JSON parse; no partial import leaving workspace in broken state | P1 |
+| QA-C022 | Project Folders | Create folder via FolderPlus button | App loaded | 1. Click FolderPlus icon in sidebar 2. Type "Music", press Enter | Folder "Music" appears in sidebar below any existing folders; persists after reload | Empty name should be rejected or default to "Untitled Folder"; new folder should be expanded by default | P1 |
+| QA-C023 | Project Folders | Rename folder via double-click | At least one folder exists | 1. Double-click folder title 2. Type new name 3. Press Enter | Folder renamed; change persists after reload | Empty name reverts to previous title; Escape cancels without saving | P2 |
+| QA-C024 | Project Folders | Drag project onto folder (desktop) | Desktop viewport; at least one folder and one ungrouped project | 1. Drag a project row onto the folder header 2. Observe purple ring/tint on drop target 3. Release | Project nests under folder; persists after reload | No drop should occur if released outside a valid target; dragged row shows opacity-50 during drag | P1 |
+| QA-C025 | Project Folders | Drag project out to Ungrouped | Project nested inside a folder | 1. Drag project from folder onto the "Ungrouped" section 2. Release | Project returns to the top (ungrouped) level | If dropped onto its own current folder, nothing changes (no-op) | P2 |
+| QA-C026 | Project Folders | Collapse/expand state persists | Folder with one or more projects | 1. Click chevron to collapse folder 2. Reload the page | Folder remains collapsed after reload | Expand also persists; collapse is undoable via Ctrl+Z but acceptable | P2 |
+| QA-C027 | Project Folders | Delete folder with projects — Keep | Folder contains >=1 project | 1. Click trash on folder 2. Modal shows 3 buttons 3. Click "Keep projects (move to root)" | Folder removed; its projects reappear in Ungrouped section; no project content lost | Active project selection should remain unchanged | P1 |
+| QA-C028 | Project Folders | Delete folder with projects — Delete Too | Folder contains >=1 project; workspace has at least 1 project outside folder | 1. Click trash on folder 2. Click "Delete projects too" | Folder and all its projects deleted including graphs; if active project was among deleted, falls back to first remaining project | Cmd+Z restores folder + projects + graphs | P1 |
+| QA-C029 | Project Folders | Delete would empty workspace — blocked | Folder contains every project in workspace | 1. Click trash 2. Click "Delete projects too" | Operation blocked with error toast ("Can't delete — workspace must keep at least one project"); nothing is deleted | No silent auto-blank project creation | P1 |
+| QA-C030 | Project Folders | Delete empty folder | Empty folder exists | 1. Click trash on empty folder | Single-button ConfirmModal appears (not the 3-button modal); confirming removes the folder | Should NOT show the keep/delete choice when there are no projects inside | P2 |
+| QA-C031 | Project Folders | Create project inside folder | Folder exists and is expanded | 1. Hover folder header 2. Click "+" button on the folder header 3. Type name, Enter | New project is created with folderId set to that folder; appears inside the folder immediately | Creating via the top-level "+" still creates an ungrouped project | P2 |
+| QA-C032 | Project Folders | Mobile action sheet: Move to folder | Mobile viewport, >=1 folder, >=1 project | 1. Tap "⋯" button on a project row 2. Pick "Move to folder…" 3. Pick a target folder | Project is moved into that folder; action sheet closes with success toast | "New folder…" shortcut creates a folder and moves project into it in one step | P1 |
+| QA-C033 | Project Folders | v1 → v2 migration | User has pre-folders localStorage data | 1. Manually edit localStorage `spatialtasks-workspace` to set `version: 1` and remove `folders` key 2. Reload the app | App loads without error; `folders: []` is injected; all existing projects appear in Ungrouped; version bumps to 2 on next save | Supabase-hydrated v1 workspace self-heals the same way | P0 |
 
 ### Group D: Auth, Mobile & Edge Cases (21 cases)
 
