@@ -69,7 +69,7 @@ No URL router — single-page app with in-memory navigation stack.
 | ListView | `src/components/ListView/ListView.tsx` | Hierarchical list view with topological sort |
 | FocusView | `src/components/FocusView/FocusView.tsx` | Single-task view: hero image, scrollable notes, status pill that auto-advances on done; transparently drills into containers |
 | ParallelChooser | `src/components/FocusView/ParallelChooser.tsx` | Condensed list shown by FocusView when a completed task unblocks multiple parallel successors |
-| StepDetailPanel | `src/components/ExecutionPanel/StepDetailPanel.tsx` | Execution mode side panel; marks container as done and advances to next task on "Complete Step & Move On" |
+| StepDetailPanel | `src/components/ExecutionPanel/StepDetailPanel.tsx` | Execution mode side panel with Tasks / Notes view switcher; markdown-rendered notes with inline editor and detected links; mobile uses dynamic viewport (dvh) + safe-area inset; marks container as done and advances to next task on "Complete Step & Move On" |
 
 ### AI / Generation
 | Component | File | Purpose |
@@ -191,6 +191,7 @@ No URL router — single-page app with in-memory navigation stack.
 - ReactFlow controls: 44px minimum touch targets
 - Handles: enlarged to 44px pseudo-element on touch
 - Safe-area insets: `--sat`, `--sar`, `--sab`, `--sal`
+- StepDetailPanel (Execute Mode): bottom sheet with `100dvh` ceiling, safe-area gutter on footer, lifts above virtual keyboard via `useKeyboardOffset`
 
 ## Existing Test Coverage
 
