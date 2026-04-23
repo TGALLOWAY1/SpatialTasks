@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useToastStore } from '../UI/Toast';
-import { FolderGit2, Mail, Lock, Github } from 'lucide-react';
+import { Mail, Lock, Github } from 'lucide-react';
 import { clsx } from 'clsx';
+import { Logo } from '../Logo';
 
 type AuthTab = 'signin' | 'signup' | 'forgot';
 
@@ -71,7 +72,7 @@ export const AuthScreen: React.FC = () => {
         <div className="flex items-center justify-center w-screen h-screen bg-black">
             <div className="w-full max-w-sm mx-4">
                 <div className="flex flex-col items-center gap-2 mb-8">
-                    <FolderGit2 className="w-10 h-10 text-purple-400" />
+                    <Logo className="w-10 h-10 text-purple-400" />
                     <h1 className="text-2xl font-bold text-white">SpatialTasks</h1>
                     <p className="text-sm text-gray-500">
                         Spatial task management with AI
