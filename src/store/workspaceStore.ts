@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { temporal } from 'zundo';
 import { v4 as uuidv4 } from 'uuid';
-import { Workspace, Node, Graph, Edge, Project, WorkspaceSettings, AccentColor } from '../types';
+import { Workspace, Node, Graph, Edge, Project, Folder, WorkspaceSettings, AccentColor } from '../types';
 import type { LayoutStrategy } from '../layout/layoutTypes';
 import { generateWorkspace } from '../utils/generator';
 import { saveGeminiConfig, loadGeminiConfig } from '../lib/workspaceSync';
@@ -66,9 +66,16 @@ interface WorkspaceState extends Workspace {
     clearCanvasAction: () => void;
 
     // Project management
-    createProject: (title: string) => void;
+    createProject: (title: string, folderId?: string) => void;
     renameProject: (projectId: string, title: string) => void;
     deleteProject: (projectId: string) => void;
+
+    // Folder management
+    createFolder: (title: string) => string;
+    renameFolder: (folderId: string, title: string) => void;
+    deleteFolder: (folderId: string, opts: { deleteProjects: boolean }) => boolean;
+    toggleFolderCollapsed: (folderId: string) => void;
+    moveProjectToFolder: (projectId: string, folderId: string | null) => void;
 
     // Graph edits
     addNode: (node: Node) => void;
@@ -238,11 +245,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 });
             },
 
-            createProject: (title) => {
-                const { projects, graphs } = get();
+            createProject: (title, folderId) => {
+                const { projects, graphs, folders } = get();
                 const projectId = uuidv4();
                 const rootGraphId = uuidv4();
                 const now = new Date().toISOString();
+
+                // Only attach folderId if it references an existing folder
+                const validFolderId = folderId && folders.some(f => f.id === folderId) ? folderId : undefined;
 
                 const newProject: Project = {
                     id: projectId,
@@ -250,6 +260,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     rootGraphId,
                     createdAt: now,
                     updatedAt: now,
+                    folderId: validFolderId,
                 };
 
                 const rootGraph: Graph = {
@@ -319,6 +330,120 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 }
 
                 set(updates);
+            },
+
+            createFolder: (title) => {
+                const { folders } = get();
+                const id = uuidv4();
+                const now = new Date().toISOString();
+                const newFolder: Folder = {
+                    id,
+                    title: title.trim() || 'Untitled Folder',
+                    collapsed: false,
+                    order: folders.length,
+                    createdAt: now,
+                    updatedAt: now,
+                };
+                set({ folders: [...folders, newFolder] });
+                return id;
+            },
+
+            renameFolder: (folderId, title) => {
+                const trimmed = title.trim();
+                if (!trimmed) return;
+                const { folders } = get();
+                set({
+                    folders: folders.map(f =>
+                        f.id === folderId ? { ...f, title: trimmed, updatedAt: new Date().toISOString() } : f
+                    ),
+                });
+            },
+
+            toggleFolderCollapsed: (folderId) => {
+                const { folders } = get();
+                set({
+                    folders: folders.map(f =>
+                        f.id === folderId ? { ...f, collapsed: !f.collapsed } : f
+                    ),
+                });
+            },
+
+            moveProjectToFolder: (projectId, folderId) => {
+                const { projects, folders } = get();
+                const project = projects.find(p => p.id === projectId);
+                if (!project) return;
+                const targetFolderId = folderId && folders.some(f => f.id === folderId) ? folderId : undefined;
+                if ((project.folderId ?? undefined) === targetFolderId) return;
+                set({
+                    projects: projects.map(p =>
+                        p.id === projectId
+                            ? { ...p, folderId: targetFolderId, updatedAt: new Date().toISOString() }
+                            : p
+                    ),
+                });
+            },
+
+            deleteFolder: (folderId, { deleteProjects }) => {
+                const { projects, folders, graphs, activeProjectId } = get();
+                const folder = folders.find(f => f.id === folderId);
+                if (!folder) return false;
+
+                const projectsInFolder = projects.filter(p => p.folderId === folderId);
+
+                if (!deleteProjects) {
+                    // Move inner projects to root, then remove folder
+                    set({
+                        projects: projects.map(p =>
+                            p.folderId === folderId
+                                ? { ...p, folderId: undefined, updatedAt: new Date().toISOString() }
+                                : p
+                        ),
+                        folders: folders.filter(f => f.id !== folderId),
+                    });
+                    return true;
+                }
+
+                // Deleting projects too — guard against emptying the workspace
+                if (projects.length - projectsInFolder.length < 1) {
+                    return false;
+                }
+
+                // Collect all descendant graph IDs for every project we're about to delete
+                const graphIdsToDelete: string[] = [];
+                const collect = (graphId: string) => {
+                    const g = graphs[graphId];
+                    if (!g) return;
+                    graphIdsToDelete.push(graphId);
+                    g.nodes.forEach(n => {
+                        if (n.childGraphId) collect(n.childGraphId);
+                    });
+                };
+                projectsInFolder.forEach(p => collect(p.rootGraphId));
+
+                const updatedGraphs = { ...graphs };
+                graphIdsToDelete.forEach(id => delete updatedGraphs[id]);
+
+                const deletedIds = new Set(projectsInFolder.map(p => p.id));
+                const updatedProjects = projects.filter(p => !deletedIds.has(p.id));
+                const updatedFolders = folders.filter(f => f.id !== folderId);
+
+                const updates: Partial<WorkspaceState> = {
+                    projects: updatedProjects,
+                    folders: updatedFolders,
+                    graphs: updatedGraphs,
+                };
+
+                if (activeProjectId && deletedIds.has(activeProjectId)) {
+                    const next = updatedProjects[0];
+                    const nextRoot = updatedGraphs[next.rootGraphId];
+                    updates.activeProjectId = next.id;
+                    updates.activeGraphId = next.rootGraphId;
+                    updates.navStack = [{ graphId: nextRoot.id, label: nextRoot.title }];
+                    updates.executionMode = false;
+                }
+
+                set(updates);
+                return true;
             },
 
             addNode: (node) => {
@@ -587,6 +712,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         if (!p.id || !p.title || !p.rootGraphId) throw new Error('Invalid project');
                     }
 
+                    // Folders are optional for backward compatibility
+                    if (data.folders !== undefined && !Array.isArray(data.folders)) {
+                        throw new Error('Invalid folders');
+                    }
+
                     // Validate graph/node/edge shape
                     for (const [gid, g] of Object.entries(data.graphs)) {
                         const graph = g as any;
@@ -607,6 +737,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
                     // Sanitize: strip any prototype pollution
                     const clean = JSON.parse(JSON.stringify(data));
+                    // Default folders to [] for pre-v2 imports
+                    if (!Array.isArray(clean.folders)) clean.folders = [];
                     set(clean);
                 } catch (e) {
                     console.error("Failed to import", e);
@@ -618,6 +750,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 const geminiConfig = loadGeminiConfig();
                 set({
                     ...data,
+                    folders: Array.isArray(data.folders) ? data.folders : [],
                     settings: {
                         ...data.settings,
                         geminiApiKey: geminiConfig.geminiApiKey,
@@ -635,7 +768,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             partialize: (state) => {
                 const { _hydrated, _supabaseLoaded, ...rest } = state;
                 // Only track data fields for undo/redo, not transient flags
-                return { graphs: rest.graphs, projects: rest.projects } as WorkspaceState;
+                return { graphs: rest.graphs, projects: rest.projects, folders: rest.folders } as WorkspaceState;
             },
             limit: 50,
         }
@@ -643,6 +776,21 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         {
             name: STORAGE_KEY,
             storage: createJSONStorage(() => localStorage),
+            version: 2,
+            migrate: (persistedState: any, fromVersion: number) => {
+                if (!persistedState || typeof persistedState !== 'object') return persistedState;
+                if (fromVersion < 2) {
+                    return {
+                        ...persistedState,
+                        version: 2,
+                        folders: Array.isArray(persistedState.folders) ? persistedState.folders : [],
+                        projects: Array.isArray(persistedState.projects)
+                            ? persistedState.projects.map((p: any) => ({ ...p, folderId: p.folderId ?? undefined }))
+                            : [],
+                    };
+                }
+                return persistedState;
+            },
             partialize: (state) => {
                 // Exclude transient flags and actions from localStorage
                 const { _hydrated, _supabaseLoaded, selectMode, _hasSelection, connectMode, autoEditNodeId, sidebarOpen, viewMode, focusNodeId, focusContextGraphId, syncStatus, syncError, lastSavedAt, pendingCanvasAction, ...rest } = state;
@@ -650,7 +798,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             },
             onRehydrateStorage: () => {
                 return (state) => {
-                    if (state) state._hydrated = true;
+                    if (state) {
+                        state._hydrated = true;
+                        // Safety net: if rehydration produced a workspace without folders (older save), heal it.
+                        if (!Array.isArray(state.folders)) {
+                            state.folders = [];
+                        }
+                    }
                 };
             },
         }

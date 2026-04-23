@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useAuthStore } from '../../store/authStore';
 import { useToastStore } from '../UI/Toast';
 import { ConfirmModal } from '../UI/ConfirmModal';
+import { FolderDeleteModal } from '../UI/FolderDeleteModal';
 import { supabase } from '../../lib/supabase';
 import { clsx } from 'clsx';
-import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus, Sparkles, FileUp, Keyboard, Sun, Moon } from 'lucide-react';
+import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus, Sparkles, FileUp, Keyboard, Sun, Moon, FolderPlus, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
+import type { Project } from '../../types';
 
 interface SidebarProps {
     onGenerateFlow?: () => void;
@@ -19,11 +21,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan, 
     const sidebarOpen = useWorkspaceStore(state => state.sidebarOpen);
     const closeSidebar = useWorkspaceStore(state => state.closeSidebar);
     const projects = useWorkspaceStore(state => state.projects);
+    const folders = useWorkspaceStore(state => state.folders);
     const activeProjectId = useWorkspaceStore(state => state.activeProjectId);
     const loadProject = useWorkspaceStore(state => state.loadProject);
     const createProject = useWorkspaceStore(state => state.createProject);
     const deleteProject = useWorkspaceStore(state => state.deleteProject);
     const renameProject = useWorkspaceStore(state => state.renameProject);
+    const createFolder = useWorkspaceStore(state => state.createFolder);
+    const renameFolder = useWorkspaceStore(state => state.renameFolder);
+    const deleteFolder = useWorkspaceStore(state => state.deleteFolder);
+    const toggleFolderCollapsed = useWorkspaceStore(state => state.toggleFolderCollapsed);
+    const moveProjectToFolder = useWorkspaceStore(state => state.moveProjectToFolder);
     const resetWorkspace = useWorkspaceStore(state => state.resetWorkspace);
     const settings = useWorkspaceStore(state => state.settings);
     const updateSettings = useWorkspaceStore(state => state.updateSettings);
@@ -37,10 +45,47 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan, 
     const [changingPassword, setChangingPassword] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
     const [newProjectTitle, setNewProjectTitle] = useState('');
+    // Target folder for inline-create. null = ungrouped root, string = folder id.
+    const [creatingInFolderId, setCreatingInFolderId] = useState<string | null>(null);
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
     const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
     const [editingProjectTitle, setEditingProjectTitle] = useState('');
+
+    // Folder-related state
+    const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+    const [newFolderTitle, setNewFolderTitle] = useState('');
+    const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+    const [editingFolderTitle, setEditingFolderTitle] = useState('');
+    const [folderDeleteId, setFolderDeleteId] = useState<string | null>(null);
+    const [emptyFolderDeleteId, setEmptyFolderDeleteId] = useState<string | null>(null);
+
+    // Drag and drop state
+    const [draggingProjectId, setDraggingProjectId] = useState<string | null>(null);
+    const [dragOverTarget, setDragOverTarget] = useState<string | null>(null); // 'ungrouped' | folderId
+
+    // Mobile action sheet state
+    const [mobileActionProjectId, setMobileActionProjectId] = useState<string | null>(null);
+    const [moveSheetProjectId, setMoveSheetProjectId] = useState<string | null>(null);
+
+    const sortedFolders = useMemo(
+        () => folders.slice().sort((a, b) => a.order - b.order),
+        [folders]
+    );
+    const ungroupedProjects = useMemo(
+        () => projects.filter(p => !p.folderId),
+        [projects]
+    );
+    const projectsByFolder = useMemo(() => {
+        const map = new Map<string, Project[]>();
+        folders.forEach(f => map.set(f.id, []));
+        projects.forEach(p => {
+            if (p.folderId && map.has(p.folderId)) {
+                map.get(p.folderId)!.push(p);
+            }
+        });
+        return map;
+    }, [folders, projects]);
 
     const geminiStatus = settings.geminiStatus || (settings.geminiApiKey ? 'configured' : 'no_key');
 
@@ -81,6 +126,79 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan, 
 
     // On mobile, hide unless drawer is open
     if (isMobile && !sidebarOpen) return null;
+
+    const renderProjectRow = (project: Project) => {
+        const isEditing = editingProjectId === project.id;
+        const isDragging = draggingProjectId === project.id;
+        const canDrag = !isMobile && !isEditing;
+        return (
+            <div
+                key={project.id}
+                className={clsx("group relative flex items-center", isDragging && "opacity-50")}
+                draggable={canDrag}
+                onDragStart={canDrag ? (e) => {
+                    e.dataTransfer.setData('application/x-spatialtasks-project', project.id);
+                    e.dataTransfer.effectAllowed = 'move';
+                    setDraggingProjectId(project.id);
+                } : undefined}
+                onDragEnd={canDrag ? () => {
+                    setDraggingProjectId(null);
+                    setDragOverTarget(null);
+                } : undefined}
+            >
+                {isEditing ? (
+                    <input
+                        autoFocus
+                        value={editingProjectTitle}
+                        onChange={(e) => setEditingProjectTitle(e.target.value)}
+                        onBlur={() => {
+                            const trimmed = editingProjectTitle.trim();
+                            if (trimmed && trimmed !== project.title) {
+                                renameProject(project.id, trimmed);
+                            }
+                            setEditingProjectId(null);
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                            if (e.key === 'Escape') setEditingProjectId(null);
+                        }}
+                        className="w-full px-3 py-2 rounded-md text-sm bg-gray-800 border border-purple-600 text-white placeholder-gray-500 focus:outline-none"
+                    />
+                ) : (
+                    <button
+                        onClick={() => { loadProject(project.id); if (isMobile) closeSidebar(); }}
+                        onDoubleClick={() => { setEditingProjectId(project.id); setEditingProjectTitle(project.title); }}
+                        className={clsx(
+                            "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
+                            activeProjectId === project.id
+                                ? "bg-purple-900/30 text-purple-300 border border-purple-800"
+                                : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                        )}
+                    >
+                        {project.title}
+                    </button>
+                )}
+                {!isEditing && isMobile && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setMobileActionProjectId(project.id); }}
+                        className="absolute right-1 p-1 rounded text-gray-600 opacity-70 hover:text-gray-300 hover:bg-gray-800 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        title="Project actions"
+                    >
+                        <MoreHorizontal className="w-3.5 h-3.5" />
+                    </button>
+                )}
+                {!isEditing && !isMobile && projects.length > 1 && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(project.id); }}
+                        className="absolute right-1 p-1 rounded text-gray-600 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-gray-800 transition-all"
+                        title="Delete project"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                )}
+            </div>
+        );
+    };
 
     const sidebarContent = (
         <div className={clsx(
@@ -261,16 +379,56 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan, 
                         )}
                         <div className="flex items-center justify-between mb-2 px-2">
                             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Projects</h3>
-                            <button
-                                onClick={() => setIsCreating(true)}
-                                className="p-0.5 rounded text-gray-500 hover:text-purple-400 hover:bg-gray-800 transition-colors"
-                                title="New project"
-                            >
-                                <Plus className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center gap-0.5">
+                                <button
+                                    onClick={() => { setIsCreatingFolder(true); setIsCreating(false); }}
+                                    className="p-0.5 rounded text-gray-500 hover:text-purple-400 hover:bg-gray-800 transition-colors"
+                                    title="New folder"
+                                >
+                                    <FolderPlus className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => { setIsCreating(true); setCreatingInFolderId(null); setIsCreatingFolder(false); }}
+                                    className="p-0.5 rounded text-gray-500 hover:text-purple-400 hover:bg-gray-800 transition-colors"
+                                    title="New project"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                         <div className="space-y-1">
-                            {isCreating && (
+                            {isCreatingFolder && (
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const title = newFolderTitle.trim() || 'Untitled Folder';
+                                        createFolder(title);
+                                        setNewFolderTitle('');
+                                        setIsCreatingFolder(false);
+                                        addToast(`Created folder "${title}"`, 'success');
+                                    }}
+                                >
+                                    <input
+                                        autoFocus
+                                        value={newFolderTitle}
+                                        onChange={(e) => setNewFolderTitle(e.target.value)}
+                                        onBlur={() => {
+                                            if (!newFolderTitle.trim()) {
+                                                setIsCreatingFolder(false);
+                                            }
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Escape') {
+                                                setNewFolderTitle('');
+                                                setIsCreatingFolder(false);
+                                            }
+                                        }}
+                                        placeholder="Folder name..."
+                                        className="w-full px-3 py-2 rounded-md text-sm bg-gray-800 border border-purple-600 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400"
+                                    />
+                                </form>
+                            )}
+                            {isCreating && creatingInFolderId === null && (
                                 <form
                                     onSubmit={(e) => {
                                         e.preventDefault();
@@ -301,51 +459,187 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan, 
                                     />
                                 </form>
                             )}
-                            {projects.map(project => (
-                                <div key={project.id} className="group relative flex items-center">
-                                    {editingProjectId === project.id ? (
-                                        <input
-                                            autoFocus
-                                            value={editingProjectTitle}
-                                            onChange={(e) => setEditingProjectTitle(e.target.value)}
-                                            onBlur={() => {
-                                                const trimmed = editingProjectTitle.trim();
-                                                if (trimmed && trimmed !== project.title) {
-                                                    renameProject(project.id, trimmed);
-                                                }
-                                                setEditingProjectId(null);
-                                            }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                                                if (e.key === 'Escape') setEditingProjectId(null);
-                                            }}
-                                            className="w-full px-3 py-2 rounded-md text-sm bg-gray-800 border border-purple-600 text-white placeholder-gray-500 focus:outline-none"
-                                        />
-                                    ) : (
-                                        <button
-                                            onClick={() => { loadProject(project.id); if (isMobile) closeSidebar(); }}
-                                            onDoubleClick={() => { setEditingProjectId(project.id); setEditingProjectTitle(project.title); }}
+
+                            {/* Ungrouped section — drop zone for projects moved out of folders */}
+                            <div
+                                className={clsx(
+                                    "rounded-md transition-colors",
+                                    dragOverTarget === 'ungrouped' && "ring-1 ring-purple-500 bg-purple-900/10"
+                                )}
+                                onDragOver={(e) => {
+                                    if (!draggingProjectId) return;
+                                    e.preventDefault();
+                                    e.dataTransfer.dropEffect = 'move';
+                                    if (dragOverTarget !== 'ungrouped') setDragOverTarget('ungrouped');
+                                }}
+                                onDragLeave={(e) => {
+                                    const related = e.relatedTarget as globalThis.Node | null;
+                                    if (related && e.currentTarget.contains(related)) return;
+                                    if (dragOverTarget === 'ungrouped') setDragOverTarget(null);
+                                }}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    const id = e.dataTransfer.getData('application/x-spatialtasks-project');
+                                    if (id) moveProjectToFolder(id, null);
+                                    setDragOverTarget(null);
+                                    setDraggingProjectId(null);
+                                }}
+                            >
+                                {ungroupedProjects.map(project => renderProjectRow(project))}
+                                {folders.length > 0 && ungroupedProjects.length === 0 && (
+                                    <div className="px-3 py-1.5 text-[11px] text-gray-600 italic select-none">
+                                        Drop here to ungroup
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Folder sections */}
+                            {sortedFolders.map(folder => {
+                                const folderProjects = projectsByFolder.get(folder.id) ?? [];
+                                const isDragOver = dragOverTarget === folder.id;
+                                return (
+                                    <div key={folder.id} className="mt-1">
+                                        <div
                                             className={clsx(
-                                                "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                                                activeProjectId === project.id
-                                                    ? "bg-purple-900/30 text-purple-300 border border-purple-800"
-                                                    : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                                                "group flex items-center rounded-md transition-colors",
+                                                isDragOver && "ring-1 ring-purple-500 bg-purple-900/10"
                                             )}
+                                            onDragOver={(e) => {
+                                                if (!draggingProjectId) return;
+                                                e.preventDefault();
+                                                e.dataTransfer.dropEffect = 'move';
+                                                if (dragOverTarget !== folder.id) setDragOverTarget(folder.id);
+                                            }}
+                                            onDragLeave={(e) => {
+                                                const related = e.relatedTarget as globalThis.Node | null;
+                                                if (related && e.currentTarget.contains(related)) return;
+                                                if (dragOverTarget === folder.id) setDragOverTarget(null);
+                                            }}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                const id = e.dataTransfer.getData('application/x-spatialtasks-project');
+                                                if (id) moveProjectToFolder(id, folder.id);
+                                                setDragOverTarget(null);
+                                                setDraggingProjectId(null);
+                                            }}
                                         >
-                                            {project.title}
-                                        </button>
-                                    )}
-                                    {projects.length > 1 && editingProjectId !== project.id && (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(project.id); }}
-                                            className="absolute right-1 p-1 rounded text-gray-600 opacity-0 group-hover:opacity-100 touch:opacity-70 hover:text-red-400 hover:bg-gray-800 transition-all touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
-                                            title="Delete project"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                    )}
-                                </div>
-                            ))}
+                                            <button
+                                                onClick={() => toggleFolderCollapsed(folder.id)}
+                                                className="p-1 text-gray-500 hover:text-gray-300 touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
+                                                title={folder.collapsed ? 'Expand folder' : 'Collapse folder'}
+                                            >
+                                                {folder.collapsed
+                                                    ? <ChevronRight className="w-3.5 h-3.5" />
+                                                    : <ChevronDown className="w-3.5 h-3.5" />}
+                                            </button>
+                                            {editingFolderId === folder.id ? (
+                                                <input
+                                                    autoFocus
+                                                    value={editingFolderTitle}
+                                                    onChange={(e) => setEditingFolderTitle(e.target.value)}
+                                                    onBlur={() => {
+                                                        const trimmed = editingFolderTitle.trim();
+                                                        if (trimmed && trimmed !== folder.title) {
+                                                            renameFolder(folder.id, trimmed);
+                                                        }
+                                                        setEditingFolderId(null);
+                                                    }}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                                        if (e.key === 'Escape') setEditingFolderId(null);
+                                                    }}
+                                                    className="flex-1 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wider bg-gray-800 border border-purple-600 text-white focus:outline-none"
+                                                />
+                                            ) : (
+                                                <button
+                                                    onClick={() => toggleFolderCollapsed(folder.id)}
+                                                    onDoubleClick={() => { setEditingFolderId(folder.id); setEditingFolderTitle(folder.title); }}
+                                                    className="flex-1 text-left px-1 py-1 text-xs font-semibold uppercase tracking-wider text-gray-400 hover:text-gray-200 truncate"
+                                                    title={folder.title}
+                                                >
+                                                    {folder.title}
+                                                </button>
+                                            )}
+                                            {editingFolderId !== folder.id && (
+                                                <>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setIsCreating(true);
+                                                            setCreatingInFolderId(folder.id);
+                                                            setIsCreatingFolder(false);
+                                                            // Ensure folder is expanded so the user sees the form
+                                                            if (folder.collapsed) toggleFolderCollapsed(folder.id);
+                                                        }}
+                                                        className="p-1 rounded text-gray-600 opacity-0 group-hover:opacity-100 touch:opacity-70 hover:text-purple-300 hover:bg-gray-800 transition-all touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
+                                                        title="New project in folder"
+                                                    >
+                                                        <Plus className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (folderProjects.length === 0) {
+                                                                setEmptyFolderDeleteId(folder.id);
+                                                            } else {
+                                                                setFolderDeleteId(folder.id);
+                                                            }
+                                                        }}
+                                                        className="p-1 mr-1 rounded text-gray-600 opacity-0 group-hover:opacity-100 touch:opacity-70 hover:text-red-400 hover:bg-gray-800 transition-all touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
+                                                        title="Delete folder"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                        {!folder.collapsed && (
+                                            <div className="pl-4 mt-0.5 space-y-1 border-l border-gray-800 ml-3">
+                                                {isCreating && creatingInFolderId === folder.id && (
+                                                    <form
+                                                        onSubmit={(e) => {
+                                                            e.preventDefault();
+                                                            const title = newProjectTitle.trim() || 'Untitled Project';
+                                                            createProject(title, folder.id);
+                                                            setNewProjectTitle('');
+                                                            setIsCreating(false);
+                                                            setCreatingInFolderId(null);
+                                                            addToast(`Created "${title}"`, 'success');
+                                                        }}
+                                                    >
+                                                        <input
+                                                            autoFocus
+                                                            value={newProjectTitle}
+                                                            onChange={(e) => setNewProjectTitle(e.target.value)}
+                                                            onBlur={() => {
+                                                                if (!newProjectTitle.trim()) {
+                                                                    setIsCreating(false);
+                                                                    setCreatingInFolderId(null);
+                                                                }
+                                                            }}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Escape') {
+                                                                    setNewProjectTitle('');
+                                                                    setIsCreating(false);
+                                                                    setCreatingInFolderId(null);
+                                                                }
+                                                            }}
+                                                            placeholder="Project name..."
+                                                            className="w-full px-3 py-2 rounded-md text-sm bg-gray-800 border border-purple-600 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400"
+                                                        />
+                                                    </form>
+                                                )}
+                                                {folderProjects.map(project => renderProjectRow(project))}
+                                                {folderProjects.length === 0 && !(isCreating && creatingInFolderId === folder.id) && (
+                                                    <div className="px-3 py-1.5 text-[11px] text-gray-600 italic select-none">
+                                                        No projects — drop one here
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
 
@@ -431,6 +725,183 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan, 
         />
     ) : null;
 
+    const folderForDelete = folderDeleteId ? folders.find(f => f.id === folderDeleteId) : null;
+    const projectsInDeletingFolder = folderForDelete
+        ? projects.filter(p => p.folderId === folderForDelete.id)
+        : [];
+    const folderDeleteModal = folderForDelete ? (
+        <FolderDeleteModal
+            folderTitle={folderForDelete.title}
+            projectCount={projectsInDeletingFolder.length}
+            onKeepProjects={() => {
+                deleteFolder(folderForDelete.id, { deleteProjects: false });
+                addToast(`Deleted folder "${folderForDelete.title}"`, 'info');
+                setFolderDeleteId(null);
+            }}
+            onDeleteProjects={() => {
+                const ok = deleteFolder(folderForDelete.id, { deleteProjects: true });
+                if (ok) {
+                    addToast(`Deleted folder "${folderForDelete.title}" and its projects`, 'info');
+                } else {
+                    addToast(`Can't delete — workspace must keep at least one project`, 'error');
+                }
+                setFolderDeleteId(null);
+            }}
+            onCancel={() => setFolderDeleteId(null)}
+        />
+    ) : null;
+
+    const emptyFolderForDelete = emptyFolderDeleteId ? folders.find(f => f.id === emptyFolderDeleteId) : null;
+    const emptyFolderDeleteModal = emptyFolderForDelete ? (
+        <ConfirmModal
+            title="Delete Folder"
+            message={`Delete empty folder "${emptyFolderForDelete.title}"?`}
+            confirmLabel="Delete Folder"
+            danger
+            onConfirm={() => {
+                deleteFolder(emptyFolderForDelete.id, { deleteProjects: false });
+                addToast(`Deleted folder "${emptyFolderForDelete.title}"`, 'info');
+                setEmptyFolderDeleteId(null);
+            }}
+            onCancel={() => setEmptyFolderDeleteId(null)}
+        />
+    ) : null;
+
+    const mobileActionProject = mobileActionProjectId
+        ? projects.find(p => p.id === mobileActionProjectId)
+        : null;
+    const mobileActionSheet = mobileActionProject ? (
+        <div
+            className="fixed inset-0 z-[100] flex items-end justify-center"
+            onClick={() => setMobileActionProjectId(null)}
+        >
+            <div className="absolute inset-0 bg-black/60" />
+            <div
+                className="relative bg-slate-800 border-t border-slate-700 rounded-t-xl shadow-2xl w-full p-4 space-y-2"
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="text-xs uppercase tracking-wider text-slate-500 text-center mb-2 truncate px-2">
+                    {mobileActionProject.title}
+                </div>
+                <button
+                    onClick={() => {
+                        setEditingProjectId(mobileActionProject.id);
+                        setEditingProjectTitle(mobileActionProject.title);
+                        setMobileActionProjectId(null);
+                    }}
+                    className="w-full px-4 py-3 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-100 transition-colors text-left"
+                >
+                    Rename
+                </button>
+                <button
+                    onClick={() => {
+                        setMoveSheetProjectId(mobileActionProject.id);
+                        setMobileActionProjectId(null);
+                    }}
+                    className="w-full px-4 py-3 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-100 transition-colors text-left"
+                >
+                    Move to folder…
+                </button>
+                {projects.length > 1 && (
+                    <button
+                        onClick={() => {
+                            setDeleteConfirmId(mobileActionProject.id);
+                            setMobileActionProjectId(null);
+                        }}
+                        className="w-full px-4 py-3 rounded-lg text-sm font-medium bg-red-600/20 text-red-300 hover:bg-red-600/30 transition-colors text-left"
+                    >
+                        Delete
+                    </button>
+                )}
+                <button
+                    onClick={() => setMobileActionProjectId(null)}
+                    className="w-full px-4 py-3 rounded-lg text-sm font-medium text-slate-400 bg-slate-900 hover:bg-slate-700 transition-colors"
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    ) : null;
+
+    const moveSheetProject = moveSheetProjectId
+        ? projects.find(p => p.id === moveSheetProjectId)
+        : null;
+    const moveSheet = moveSheetProject ? (
+        <div
+            className="fixed inset-0 z-[100] flex items-end justify-center"
+            onClick={() => setMoveSheetProjectId(null)}
+        >
+            <div className="absolute inset-0 bg-black/60" />
+            <div
+                className="relative bg-slate-800 border-t border-slate-700 rounded-t-xl shadow-2xl w-full p-4 max-h-[70vh] overflow-y-auto space-y-2"
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="text-xs uppercase tracking-wider text-slate-500 text-center mb-2">
+                    Move &ldquo;{moveSheetProject.title}&rdquo; to…
+                </div>
+                <button
+                    onClick={() => {
+                        moveProjectToFolder(moveSheetProject.id, null);
+                        setMoveSheetProjectId(null);
+                        addToast('Moved to Ungrouped', 'success');
+                    }}
+                    disabled={!moveSheetProject.folderId}
+                    className={clsx(
+                        "w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors text-left",
+                        !moveSheetProject.folderId
+                            ? "bg-slate-900 text-slate-500 cursor-default"
+                            : "bg-slate-700 hover:bg-slate-600 text-slate-100"
+                    )}
+                >
+                    Ungrouped {!moveSheetProject.folderId && '(current)'}
+                </button>
+                {sortedFolders.map(folder => {
+                    const isCurrent = moveSheetProject.folderId === folder.id;
+                    return (
+                        <button
+                            key={folder.id}
+                            onClick={() => {
+                                moveProjectToFolder(moveSheetProject.id, folder.id);
+                                setMoveSheetProjectId(null);
+                                addToast(`Moved to "${folder.title}"`, 'success');
+                            }}
+                            disabled={isCurrent}
+                            className={clsx(
+                                "w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors text-left",
+                                isCurrent
+                                    ? "bg-slate-900 text-slate-500 cursor-default"
+                                    : "bg-slate-700 hover:bg-slate-600 text-slate-100"
+                            )}
+                        >
+                            {folder.title} {isCurrent && '(current)'}
+                        </button>
+                    );
+                })}
+                <button
+                    onClick={() => {
+                        const title = window.prompt('New folder name');
+                        const trimmed = (title ?? '').trim();
+                        if (!trimmed) return;
+                        const id = createFolder(trimmed);
+                        moveProjectToFolder(moveSheetProject.id, id);
+                        setMoveSheetProjectId(null);
+                        addToast(`Created folder "${trimmed}"`, 'success');
+                    }}
+                    className="w-full px-4 py-3 rounded-lg text-sm font-medium bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 transition-colors text-left flex items-center gap-2"
+                >
+                    <FolderPlus className="w-4 h-4" />
+                    New folder…
+                </button>
+                <button
+                    onClick={() => setMoveSheetProjectId(null)}
+                    className="w-full px-4 py-3 rounded-lg text-sm font-medium text-slate-400 bg-slate-900 hover:bg-slate-700 transition-colors"
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    ) : null;
+
     if (isMobile) {
         return (
             <>
@@ -447,6 +918,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan, 
                 </div>
                 {resetConfirmModal}
                 {deleteConfirmModal}
+                {folderDeleteModal}
+                {emptyFolderDeleteModal}
+                {mobileActionSheet}
+                {moveSheet}
             </>
         );
     }
@@ -456,6 +931,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan, 
             {sidebarContent}
             {resetConfirmModal}
             {deleteConfirmModal}
+            {folderDeleteModal}
+            {emptyFolderDeleteModal}
         </>
     );
 };
