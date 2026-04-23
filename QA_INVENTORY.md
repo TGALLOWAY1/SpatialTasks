@@ -77,7 +77,8 @@ No URL router — single-page app with in-memory navigation stack.
 | FlowGenerator | `src/components/FlowGenerator/FlowGenerator.tsx` | AI flow generation orchestrator |
 | GenerateFlowModal | `src/components/FlowGenerator/GenerateFlowModal.tsx` | Generation form UI |
 | DraftReviewPanel | `src/components/FlowGenerator/DraftReviewPanel.tsx` | Review generated drafts |
-| MarkdownImporter | `src/components/FlowGenerator/MarkdownImporter.tsx` | Import markdown plans |
+| MarkdownImporter | `src/components/FlowGenerator/MarkdownImporter.tsx` | Import markdown plans — 4 tabs (Upload / Paste / Templates / AI Prompt); understands `(parallel)` and `depends_on:` DSL |
+| Plan templates | `src/utils/planTemplates.ts` | 3 starter templates (Project Plan, Learning Path, General Workflow) + external LLM prompt template |
 
 ### Auth
 | Component | File | Purpose |

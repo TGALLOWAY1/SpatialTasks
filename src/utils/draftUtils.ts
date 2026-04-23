@@ -7,24 +7,66 @@ const SPACING_X = 280;
 const START_X = 100;
 const START_Y = 100;
 const CHILD_SPACING_X = 250;
+const CHILD_SPACING_Y = 110;
 const CHILD_START_X = 80;
 const CHILD_START_Y = 80;
 
+// Normalize labels so depends_on lookups are lenient (case + whitespace).
+const normalizeLabel = (s: string): string => s.trim().toLowerCase();
+
+/**
+ * Resolve depends_on labels within a sibling group into edges.
+ * Unresolved references are reported via the warnings array.
+ */
+function resolveDependencyEdges(
+    siblings: DraftNode[],
+    idByIndex: string[],
+    graphId: string,
+    warnings: string[],
+    scopeLabel: string,
+): Edge[] {
+    const edges: Edge[] = [];
+    const labelMap = new Map<string, string>();
+    siblings.forEach((s, i) => labelMap.set(normalizeLabel(s.label), idByIndex[i]));
+
+    siblings.forEach((sibling, i) => {
+        if (!sibling.dependsOn || sibling.dependsOn.length === 0) return;
+        const targetId = idByIndex[i];
+        sibling.dependsOn.forEach(dep => {
+            const sourceId = labelMap.get(normalizeLabel(dep));
+            if (!sourceId) {
+                warnings.push(
+                    `${scopeLabel}: "${sibling.label}" depends on "${dep}" but no sibling with that label was found.`,
+                );
+                return;
+            }
+            if (sourceId === targetId) return; // ignore self-reference
+            edges.push({ id: uuidv4(), graphId, source: sourceId, target: targetId });
+        });
+    });
+
+    return edges;
+}
+
 /**
  * Convert draft outline → canvas nodes/edges/graphs.
- * Enhanced to populate meta.notes and meta.verification from DraftNode.description.
+ * Enhanced to populate meta.notes and meta.verification from DraftNode.description,
+ * honor parallel groups (no sequential edges), and resolve depends_on cross-edges.
  */
 export function draftToCanvas(
     draftNodes: DraftNode[],
     projectId: string,
     rootGraphId: string,
-): { nodes: Node[]; edges: Edge[]; childGraphs: Graph[] } {
+): { nodes: Node[]; edges: Edge[]; childGraphs: Graph[]; warnings: string[] } {
     const canvasNodes: Node[] = [];
     const canvasEdges: Edge[] = [];
     const childGraphs: Graph[] = [];
+    const warnings: string[] = [];
+    const topLevelIds: string[] = [];
 
     draftNodes.forEach((draftNode, i) => {
         const nodeId = uuidv4();
+        topLevelIds.push(nodeId);
         const hasChildren = draftNode.children && draftNode.children.length > 0;
 
         // Parse description for notes and verification
@@ -45,10 +87,16 @@ export function draftToCanvas(
                 edges: [],
             };
 
+            const children = draftNode.children!;
+            const parallelGroup = draftNode.parallel === true;
+            const childIds: string[] = [];
+
             // Create child action nodes inside the child graph
             let prevChildId: string | null = null;
-            draftNode.children!.forEach((child, ci) => {
+            children.forEach((child, ci) => {
                 const childNodeId = uuidv4();
+                childIds.push(childNodeId);
+
                 const childMeta: Record<string, any> = {};
                 if (child.description) {
                     const { notes: childNotes, verification: childVerification } =
@@ -57,20 +105,28 @@ export function draftToCanvas(
                     if (childVerification) childMeta.verification = childVerification;
                 }
 
+                // Parallel groups stack vertically; default groups stack horizontally.
+                const x = parallelGroup ? CHILD_START_X : CHILD_START_X + ci * CHILD_SPACING_X;
+                const y = parallelGroup ? CHILD_START_Y + ci * CHILD_SPACING_Y : CHILD_START_Y;
+
                 childGraph.nodes.push({
                     id: childNodeId,
                     graphId: childGraphId,
                     type: 'action',
                     title: child.label,
-                    x: CHILD_START_X + ci * CHILD_SPACING_X,
-                    y: CHILD_START_Y,
+                    x,
+                    y,
                     width: 200,
                     height: 50,
                     status: 'todo',
                     ...(Object.keys(childMeta).length > 0 ? { meta: childMeta } : {}),
                 });
-                // Sequential edges between children
-                if (prevChildId) {
+
+                // Sequential chain between children, skipped for parallel groups
+                // and for children that declare explicit depends_on (their edges come
+                // from dependency resolution instead).
+                const hasExplicitDeps = Array.isArray(child.dependsOn) && child.dependsOn.length > 0;
+                if (!parallelGroup && !hasExplicitDeps && prevChildId) {
                     childGraph.edges.push({
                         id: uuidv4(),
                         graphId: childGraphId,
@@ -80,6 +136,16 @@ export function draftToCanvas(
                 }
                 prevChildId = childNodeId;
             });
+
+            // Resolve depends_on edges among the children of this container
+            const depEdges = resolveDependencyEdges(
+                children,
+                childIds,
+                childGraphId,
+                warnings,
+                `In "${draftNode.label}"`,
+            );
+            childGraph.edges.push(...depEdges);
 
             childGraphs.push(childGraph);
 
@@ -111,35 +177,49 @@ export function draftToCanvas(
             });
         }
 
-        // Sequential edges between top-level nodes
-        if (i > 0 && canvasNodes.length >= 2) {
+        // Sequential edge between top-level nodes, skipped when this node is marked parallel
+        // or has explicit depends_on. A node flagged `parallel` means it runs alongside its
+        // predecessor rather than after it.
+        const hasExplicitTopDeps = Array.isArray(draftNode.dependsOn) && draftNode.dependsOn.length > 0;
+        const skipTopChain = draftNode.parallel === true || hasExplicitTopDeps;
+        if (i > 0 && !skipTopChain) {
             canvasEdges.push({
                 id: uuidv4(),
                 graphId: rootGraphId,
-                source: canvasNodes[canvasNodes.length - 2].id,
+                source: topLevelIds[i - 1],
                 target: nodeId,
             });
         }
     });
 
-    return { nodes: canvasNodes, edges: canvasEdges, childGraphs };
+    // Resolve depends_on edges among top-level nodes
+    const topDepEdges = resolveDependencyEdges(
+        draftNodes,
+        topLevelIds,
+        rootGraphId,
+        warnings,
+        'Top-level',
+    );
+    canvasEdges.push(...topDepEdges);
+
+    return { nodes: canvasNodes, edges: canvasEdges, childGraphs, warnings };
 }
 
 /**
  * Create a full project from draft nodes and add it to the store.
- * Returns the created project ID.
+ * Returns the created project ID and any import-time warnings (e.g. unresolved depends_on).
  */
 export function createProjectFromDraft(
     title: string,
     draftNodes: DraftNode[],
-): string {
+): { projectId: string; warnings: string[] } {
     const store = useWorkspaceStore.getState();
 
     const projectId = uuidv4();
     const rootGraphId = uuidv4();
     const now = new Date().toISOString();
 
-    const { nodes, edges, childGraphs } = draftToCanvas(draftNodes, projectId, rootGraphId);
+    const { nodes, edges, childGraphs, warnings } = draftToCanvas(draftNodes, projectId, rootGraphId);
 
     const rootGraph: Graph = {
         id: rootGraphId,
@@ -171,5 +251,5 @@ export function createProjectFromDraft(
         executionMode: false,
     });
 
-    return projectId;
+    return { projectId, warnings };
 }

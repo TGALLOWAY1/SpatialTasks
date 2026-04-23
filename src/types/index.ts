@@ -103,6 +103,9 @@ export interface DraftNode {
     description?: string;
     children?: DraftNode[];
     order: number;
+    // Structured Plan Import extensions
+    parallel?: boolean;     // true → children execute in parallel (no sequential edges between siblings)
+    dependsOn?: string[];   // sibling labels this node depends on; resolved to edges at render time
 }
 
 export interface FlowDraft {

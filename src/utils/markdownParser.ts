@@ -14,11 +14,19 @@ export interface ParsedPlan {
  * Parsing rules:
  * - `# Heading` → project title
  * - `## Step Title` → top-level DraftNode (container if it has bullet children, action otherwise)
+ * - `## Step Title (parallel)` → same, with parallel flag (skips sequential edges between its children)
  * - Text paragraphs under ## → stored in description (becomes meta.notes)
- * - `- bullet` or `* bullet` → child DraftNode (substep)
+ * - `- bullet` or `* bullet` → child DraftNode (substep). The leading `Task:` / `Subtask:` label
+ *   is stripped so PRD-style `- Task: Name` renders the same as `- Name`.
  * - `### Verification` → verification section stored with marker in description
  * - Nested bullets (indented) → appended to parent bullet label
+ * - Indented annotations after a bullet (`  depends_on: Label, Other` or `  parallel: true`)
+ *   attach to the most recently-parsed child.
  */
+const PARALLEL_RE = /\s*\(parallel\)\s*$/i;
+const ANNOTATION_RE = /^\s{2,}(depends_on|parallel)\s*:\s*(.+)$/i;
+const TASK_PREFIX_RE = /^(?:task|subtask)\s*:\s*/i;
+
 export function parseMarkdownPlan(
     markdown: string,
     fallbackTitle: string = 'Imported Plan'
@@ -33,7 +41,8 @@ export function parseMarkdownPlan(
         label: string;
         description: string;
         verification: string;
-        children: { label: string; description: string }[];
+        parallel: boolean;
+        children: { label: string; description: string; parallel?: boolean; dependsOn?: string[] }[];
     } | null = null;
 
     let inVerification = false;
@@ -49,6 +58,8 @@ export function parseMarkdownPlan(
                       label: c.label,
                       description: c.description || undefined,
                       order: i,
+                      ...(c.parallel ? { parallel: true } : {}),
+                      ...(c.dependsOn && c.dependsOn.length > 0 ? { dependsOn: c.dependsOn } : {}),
                   }))
                 : undefined;
 
@@ -63,6 +74,7 @@ export function parseMarkdownPlan(
             description: description || undefined,
             children,
             order: topLevelNodes.length,
+            ...(currentNode.parallel ? { parallel: true } : {}),
         });
 
         currentNode = null;
@@ -81,17 +93,41 @@ export function parseMarkdownPlan(
             continue;
         }
 
-        // ## Step heading (h2)
+        // ## Step heading (h2) — may carry a trailing "(parallel)" marker
         const h2Match = line.match(/^## (.+)/);
         if (h2Match) {
             flushCurrentNode();
+            const raw = h2Match[1].trim();
+            const parallel = PARALLEL_RE.test(raw);
+            const label = parallel ? raw.replace(PARALLEL_RE, '').trim() : raw;
             currentNode = {
-                label: h2Match[1].trim(),
+                label,
                 description: '',
                 verification: '',
+                parallel,
                 children: [],
             };
             inVerification = false;
+            continue;
+        }
+
+        // Indented annotation (depends_on: / parallel:) attached to the most recent child
+        const annotationMatch = line.match(ANNOTATION_RE);
+        if (annotationMatch && currentNode && currentNode.children.length > 0 && !inVerification) {
+            const key = annotationMatch[1].toLowerCase();
+            const value = annotationMatch[2].trim();
+            const lastChild = currentNode.children[currentNode.children.length - 1];
+            if (key === 'depends_on') {
+                const deps = value
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(Boolean);
+                lastChild.dependsOn = [...(lastChild.dependsOn ?? []), ...deps];
+            } else if (key === 'parallel') {
+                if (/^(true|yes|1)$/i.test(value)) {
+                    lastChild.parallel = true;
+                }
+            }
             continue;
         }
 
@@ -122,7 +158,7 @@ export function parseMarkdownPlan(
         const bulletMatch = line.match(/^(\s*)([-*])\s+(.+)/);
         if (bulletMatch && currentNode) {
             const indent = bulletMatch[1].length;
-            const text = bulletMatch[3].trim();
+            const text = bulletMatch[3].trim().replace(TASK_PREFIX_RE, '');
 
             if (inVerification) {
                 // Verification bullets stay in verification text
@@ -142,7 +178,7 @@ export function parseMarkdownPlan(
         const numberedMatch = line.match(/^(\s*)\d+\.\s+(.+)/);
         if (numberedMatch && currentNode) {
             const indent = numberedMatch[1].length;
-            const text = numberedMatch[2].trim();
+            const text = numberedMatch[2].trim().replace(TASK_PREFIX_RE, '');
 
             if (inVerification) {
                 currentNode.verification += `- ${text}\n`;
