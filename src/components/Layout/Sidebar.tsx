@@ -6,7 +6,8 @@ import { ConfirmModal } from '../UI/ConfirmModal';
 import { FolderDeleteModal } from '../UI/FolderDeleteModal';
 import { supabase } from '../../lib/supabase';
 import { clsx } from 'clsx';
-import { FolderGit2, RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus, Sparkles, FileUp, Keyboard, Sun, Moon, FolderPlus, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { RefreshCw, Settings, Eye, EyeOff, KeyRound, Trash2, ArrowLeft, ExternalLink, LogOut, User, Lock, Plus, Sparkles, FileUp, Keyboard, Sun, Moon, FolderPlus, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { Logo } from '../Logo';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 import type { Project } from '../../types';
 
@@ -207,7 +208,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onGenerateFlow, onImportPlan, 
         )}>
             <div className="p-4 border-b border-gray-800 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <FolderGit2 className="w-5 h-5 text-purple-400" />
+                    <Logo className="w-5 h-5 text-purple-400" />
                     SpatialTasks
                 </h2>
                 <button
