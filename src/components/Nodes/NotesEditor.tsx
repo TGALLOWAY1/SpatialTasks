@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { X, Copy, Check, Maximize2 } from 'lucide-react';
 import { useKeyboardOffset } from '../../hooks/useKeyboardOffset';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
+import { extractUrls } from '../../utils/urls';
 
 interface NotesEditorProps {
     notes: string;
@@ -9,12 +10,6 @@ interface NotesEditorProps {
     onClose: () => void;
     accentColor?: 'slate' | 'indigo';
 }
-
-const urlRegex = /https?:\/\/[^\s)]+/gi;
-const extractUrls = (text: string): string[] => {
-    if (!text) return [];
-    return Array.from(new Set(text.match(urlRegex) ?? []));
-};
 
 const ExpandedNotesModal = ({ value, onChange, onSave, onClose, accentColor }: {
     value: string;
