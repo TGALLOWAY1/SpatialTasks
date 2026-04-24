@@ -169,6 +169,11 @@ export const StepDetailPanel: React.FC = () => {
         setDraftNotes('');
     }, []);
 
+    const detectedLinks = useMemo(
+        () => (view === 'notes' ? extractMarkdownLinks(parentInfo?.notes ?? '') : []),
+        [view, parentInfo?.notes]
+    );
+
     // Don't show unless in execution mode and inside a container
     if (!executionMode || navStack.length < 2) return null;
 
@@ -194,11 +199,6 @@ export const StepDetailPanel: React.FC = () => {
             </button>
         );
     }
-
-    const detectedLinks = useMemo(
-        () => (view === 'notes' ? extractMarkdownLinks(parentInfo?.notes ?? '') : []),
-        [view, parentInfo?.notes]
-    );
 
     return (
         <div
