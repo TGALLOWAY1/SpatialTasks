@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { clsx } from 'clsx';
-import { Wand2, Sparkles, Grid3x3, Network, GitBranch } from 'lucide-react';
+import { Wand2, Grid3x3, Network, ArrowDown, ArrowRight } from 'lucide-react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import type { LayoutStrategy } from '../../layout/layoutTypes';
+import type { LayoutStrategy, LayoutOrientation } from '../../layout/layoutTypes';
 
 interface StrategyDef {
     id: LayoutStrategy;
@@ -12,10 +12,8 @@ interface StrategyDef {
 }
 
 const STRATEGIES: StrategyDef[] = [
-    { id: 'cluster',   label: 'Cluster',   description: 'Groups related nodes — smart default',     icon: <Sparkles className="w-4 h-4" /> },
-    { id: 'grid',      label: 'Grid',      description: 'Clean rows and columns',                   icon: <Grid3x3 className="w-4 h-4" /> },
-    { id: 'hierarchy', label: 'Hierarchy', description: 'Top-down tree by dependencies',            icon: <Network className="w-4 h-4" /> },
-    { id: 'flow',      label: 'Flow',      description: 'Left-to-right workflow',                   icon: <GitBranch className="w-4 h-4" /> },
+    { id: 'tidy', label: 'Tidy', description: 'Hierarchy when edges exist; otherwise grid by group', icon: <Network className="w-4 h-4" /> },
+    { id: 'grid', label: 'Grid', description: 'Clean rows and columns by current position',          icon: <Grid3x3 className="w-4 h-4" /> },
 ];
 
 interface Props {
@@ -24,9 +22,9 @@ interface Props {
 }
 
 /**
- * Toolbar-anchored popover for Auto-Organize. Shows one button per strategy
- * plus a "selection only" checkbox when nodes are selected. Remembers the
- * last-used strategy in settings.preferredLayoutStrategy.
+ * Toolbar-anchored popover for Auto-Organize. Two strategies plus a top-down /
+ * left-right orientation toggle that applies to Tidy. Remembers the last-used
+ * strategy and orientation in settings.
  */
 export const LayoutMenu: React.FC<Props> = ({ compact = true }) => {
     const [open, setOpen] = useState(false);
@@ -36,6 +34,7 @@ export const LayoutMenu: React.FC<Props> = ({ compact = true }) => {
     const dispatchCanvasAction = useWorkspaceStore(s => s.dispatchCanvasAction);
     const updateSettings = useWorkspaceStore(s => s.updateSettings);
     const preferred = useWorkspaceStore(s => s.settings.preferredLayoutStrategy);
+    const orientation: LayoutOrientation = useWorkspaceStore(s => s.settings.preferredLayoutOrientation) ?? 'top-down';
     const hasSelection = useWorkspaceStore(s => s._hasSelection);
 
     useEffect(() => {
@@ -53,12 +52,21 @@ export const LayoutMenu: React.FC<Props> = ({ compact = true }) => {
         };
     }, [open]);
 
+    const setOrientation = (o: LayoutOrientation) => {
+        updateSettings({ preferredLayoutOrientation: o });
+    };
+
     const apply = (strategy: LayoutStrategy) => {
         // Selection is held by ReactFlow; empty-array nodeIds is a sentinel
         // telling CanvasArea to substitute the currently selected node IDs.
         const nodeIds = selectionOnly && hasSelection ? [] : undefined;
         updateSettings({ preferredLayoutStrategy: strategy });
-        dispatchCanvasAction({ type: 'auto-organize', strategy, nodeIds });
+        dispatchCanvasAction({
+            type: 'auto-organize',
+            strategy,
+            orientation: strategy === 'tidy' ? orientation : undefined,
+            nodeIds,
+        });
         setOpen(false);
     };
 
@@ -103,6 +111,34 @@ export const LayoutMenu: React.FC<Props> = ({ compact = true }) => {
                             </span>
                         </button>
                     ))}
+
+                    <div className="border-t border-gray-700 my-1" />
+                    <div className="px-3 py-2">
+                        <div className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">Tidy direction</div>
+                        <div className="flex gap-1 bg-gray-900 rounded p-0.5">
+                            <button
+                                onClick={() => setOrientation('top-down')}
+                                className={clsx(
+                                    'flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-xs transition-colors',
+                                    orientation === 'top-down' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200',
+                                )}
+                                aria-pressed={orientation === 'top-down'}
+                            >
+                                <ArrowDown className="w-3 h-3" /> Top-down
+                            </button>
+                            <button
+                                onClick={() => setOrientation('left-right')}
+                                className={clsx(
+                                    'flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-xs transition-colors',
+                                    orientation === 'left-right' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200',
+                                )}
+                                aria-pressed={orientation === 'left-right'}
+                            >
+                                <ArrowRight className="w-3 h-3" /> Left-right
+                            </button>
+                        </div>
+                    </div>
+
                     {hasSelection && (
                         <>
                             <div className="border-t border-gray-700 my-1" />

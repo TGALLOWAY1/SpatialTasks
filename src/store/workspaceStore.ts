@@ -3,7 +3,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { temporal } from 'zundo';
 import { v4 as uuidv4 } from 'uuid';
 import { Workspace, Node, Graph, Edge, Project, Folder, WorkspaceSettings, AccentColor } from '../types';
-import type { LayoutStrategy } from '../layout/layoutTypes';
+import type { LayoutStrategy, LayoutOrientation } from '../layout/layoutTypes';
+import { migrateStrategy, migrateOrientation } from '../layout/layoutTypes';
 import { generateWorkspace } from '../utils/generator';
 import { saveGeminiConfig, loadGeminiConfig } from '../lib/workspaceSync';
 
@@ -14,7 +15,7 @@ export type CanvasAction =
     | { type: 'advance-next'; fromNodeId: string }
     | { type: 'spotlight-blockers'; sourceNodeId: string; blockerIds: string[] }
     | { type: 'select-and-frame'; nodeId: string }
-    | { type: 'auto-organize'; strategy: LayoutStrategy; nodeIds?: string[] };
+    | { type: 'auto-organize'; strategy: LayoutStrategy; orientation?: LayoutOrientation; nodeIds?: string[] };
 
 interface WorkspaceState extends Workspace {
     // Transient flags (not persisted)
@@ -748,6 +749,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             // Supabase sync actions
             hydrateFromSupabase: (data) => {
                 const geminiConfig = loadGeminiConfig();
+                const legacy = data.settings?.preferredLayoutStrategy;
                 set({
                     ...data,
                     folders: Array.isArray(data.folders) ? data.folders : [],
@@ -755,6 +757,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         ...data.settings,
                         geminiApiKey: geminiConfig.geminiApiKey,
                         geminiStatus: geminiConfig.geminiStatus,
+                        preferredLayoutStrategy: migrateStrategy(legacy),
+                        preferredLayoutOrientation: migrateOrientation(
+                            legacy,
+                            data.settings?.preferredLayoutOrientation,
+                        ),
                     },
                     _supabaseLoaded: true,
                 });
@@ -803,6 +810,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         // Safety net: if rehydration produced a workspace without folders (older save), heal it.
                         if (!Array.isArray(state.folders)) {
                             state.folders = [];
+                        }
+                        // Migrate legacy layout strategy values (cluster/hierarchy/flow → tidy).
+                        const legacy = state.settings?.preferredLayoutStrategy;
+                        if (state.settings) {
+                            state.settings.preferredLayoutStrategy = migrateStrategy(legacy);
+                            state.settings.preferredLayoutOrientation = migrateOrientation(
+                                legacy,
+                                state.settings.preferredLayoutOrientation,
+                            );
                         }
                     }
                 };
