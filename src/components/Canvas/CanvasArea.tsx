@@ -20,7 +20,7 @@ import { ContextMenu, MenuItem } from '../UI/ContextMenu';
 import { ConfirmModal } from '../UI/ConfirmModal';
 import { ActionSheet } from '../UI/ActionSheet';
 import { FloatingActionButton } from '../UI/FloatingActionButton';
-import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Sparkles, Maximize2, Palette, Ban, Wand2, Grid3x3, Network, GitBranch } from 'lucide-react';
+import { Trash2, Circle, Clock, CheckCircle2, Plus, Layers, MousePointerClick, Sparkles, Maximize2, Palette, Ban, Wand2, Grid3x3, Network, ArrowRight } from 'lucide-react';
 import { ACCENT_COLORS, ACCENT_BAR, ACCENT_LABEL } from '../../utils/accent';
 import type { AccentColor } from '../../types';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
@@ -28,7 +28,8 @@ import { isNodeActionable, getBlockingNodes, BlockingNodeInfo } from '../../util
 import { StepDetailPanel } from '../ExecutionPanel/StepDetailPanel';
 import { BlockedSpotlight, useBlockingTitles } from './BlockedSpotlight';
 import { computeLayout } from '../../layout/layoutEngine';
-import type { LayoutStrategy } from '../../layout/layoutTypes';
+import type { LayoutStrategy, LayoutOrientation } from '../../layout/layoutTypes';
+import type { Size } from '../../layout/sizeMap';
 
 const nodeTypes = {
     container: ContainerNode,
@@ -42,6 +43,7 @@ interface CanvasInnerProps {
 const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     const { isTouchDevice } = useDeviceDetect();
     const rafRef = useRef<number>(0);
+    const wrapperRef = useRef<HTMLDivElement>(null);
 
     const activeGraphId = useWorkspaceStore(state => state.activeGraphId);
     const graphs = useWorkspaceStore(state => state.graphs);
@@ -472,16 +474,33 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 if (selectedNodeIds.length < 2) return;
             }
 
+            // Read live-measured node sizes from ReactFlow so resized containers
+            // and auto-fit action nodes pack correctly. RF populates width/height
+            // after the first render.
+            const rfNodes = reactFlowInstance.getNodes();
+            const sizeOverrides = new Map<string, Size>();
+            for (const n of rfNodes) {
+                if (n.width && n.height) sizeOverrides.set(n.id, { w: n.width, h: n.height });
+            }
+
+            // Compute viewport center in flow coords as a fallback anchor.
+            const viewport = reactFlowInstance.getViewport();
+            const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+            const viewportCenter = wrapperRect ? {
+                x: (-viewport.x + wrapperRect.width / 2) / viewport.zoom,
+                y: (-viewport.y + wrapperRect.height / 2) / viewport.zoom,
+            } : undefined;
+
             const targets = computeLayout(
-                { nodes: currentGraph.nodes, edges: currentGraph.edges },
+                { nodes: currentGraph.nodes, edges: currentGraph.edges, sizeOverrides, viewportCenter },
                 action.strategy,
-                { selectedNodeIds },
+                { selectedNodeIds, orientation: action.orientation },
             );
             if (targets.length === 0) return;
 
             const targetMap = new Map(targets.map(t => [t.id, t] as const));
             const startPositions = new Map(
-                reactFlowInstance.getNodes().map(n => [n.id, { x: n.position.x, y: n.position.y }] as const)
+                rfNodes.map(n => [n.id, { x: n.position.x, y: n.position.y }] as const)
             );
 
             const DURATION = 450;
@@ -509,8 +528,30 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 } else {
                     // Commit final positions to the store — single undo entry.
                     batchUpdatePositions(targets);
-                    // Reframe.
-                    reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+                    // Reframe only when the result falls (partly) outside the visible flow rect,
+                    // so a small selection-only tidy doesn't jump the camera.
+                    if (wrapperRect) {
+                        const visMinX = -viewport.x / viewport.zoom;
+                        const visMinY = -viewport.y / viewport.zoom;
+                        const visMaxX = visMinX + wrapperRect.width / viewport.zoom;
+                        const visMaxY = visMinY + wrapperRect.height / viewport.zoom;
+                        let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
+                        for (const t of targets) {
+                            const sz = sizeOverrides.get(t.id);
+                            const w = sz?.w ?? 200;
+                            const h = sz?.h ?? 50;
+                            if (t.x < bMinX) bMinX = t.x;
+                            if (t.y < bMinY) bMinY = t.y;
+                            if (t.x + w > bMaxX) bMaxX = t.x + w;
+                            if (t.y + h > bMaxY) bMaxY = t.y + h;
+                        }
+                        const outside = bMinX < visMinX || bMinY < visMinY || bMaxX > visMaxX || bMaxY > visMaxY;
+                        if (outside) {
+                            reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+                        }
+                    } else {
+                        reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+                    }
                 }
             };
             requestAnimationFrame(step);
@@ -859,8 +900,8 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         }
 
         // Pane menu
-        const organize = (strategy: LayoutStrategy) => {
-            useWorkspaceStore.getState().dispatchCanvasAction({ type: 'auto-organize', strategy });
+        const organize = (strategy: LayoutStrategy, orientation?: LayoutOrientation) => {
+            useWorkspaceStore.getState().dispatchCanvasAction({ type: 'auto-organize', strategy, orientation });
         };
         return [
             {
@@ -904,10 +945,9 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 label: 'Auto-Organize',
                 icon: <Wand2 className="w-4 h-4" />,
                 submenu: [
-                    { label: 'Cluster (smart)', icon: <Sparkles className="w-4 h-4" />, onClick: () => organize('cluster') },
+                    { label: 'Tidy (top-down)', icon: <Network className="w-4 h-4" />, onClick: () => organize('tidy', 'top-down') },
+                    { label: 'Tidy (left-right)', icon: <ArrowRight className="w-4 h-4" />, onClick: () => organize('tidy', 'left-right') },
                     { label: 'Grid', icon: <Grid3x3 className="w-4 h-4" />, onClick: () => organize('grid') },
-                    { label: 'Hierarchy', icon: <Network className="w-4 h-4" />, onClick: () => organize('hierarchy') },
-                    { label: 'Flow', icon: <GitBranch className="w-4 h-4" />, onClick: () => organize('flow') },
                 ],
                 onClick: () => {},
             },
@@ -948,7 +988,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     if (!graph) return <div className="text-gray-500 flex items-center justify-center h-full">No graph selected</div>;
 
     return (
-        <div className="flex-1 h-full bg-gray-950 relative" tabIndex={0}>
+        <div ref={wrapperRef} className="flex-1 h-full bg-gray-950 relative" tabIndex={0}>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}

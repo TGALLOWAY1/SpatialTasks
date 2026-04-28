@@ -1,15 +1,19 @@
 import type { LayoutInput, LayoutOptions, LayoutStrategy, Positioned } from './layoutTypes';
 import { resolveOptions } from './layoutTypes';
 import { gridLayout } from './strategies/gridLayout';
-import { hierarchyLayout } from './strategies/hierarchyLayout';
-import { clusterLayout } from './strategies/clusterLayout';
-import { flowLayout } from './strategies/flowLayout';
-import { buildSizeMap, resolveOverlaps } from './bboxUtils';
-import { preserveCentroid } from './preserveMap';
+import { tidyLayout } from './strategies/tidyLayout';
+import { buildSizeFor } from './sizeMap';
+import { anchorLayout } from './anchor';
 
 /**
- * Entry point. Pure function: same input + options → same output.
- * Caller is responsible for applying the returned positions via the store.
+ * Pure function: given the same input + options it returns the same output.
+ * The caller is responsible for applying positions via the store.
+ *
+ * The engine guarantees no overlapping AABBs in its output:
+ *   - Tidy uses dagre (Sugiyama), which is overlap-free by construction
+ *   - Grid is a row-packed bin-pack that reserves measured w/h + gutter per cell
+ *
+ * No post-hoc overlap resolver runs; the previous one mangled column alignment.
  */
 export function computeLayout(
     input: LayoutInput,
@@ -20,56 +24,46 @@ export function computeLayout(
     const subset = opts.selectedNodeIds && opts.selectedNodeIds.length > 0
         ? new Set(opts.selectedNodeIds)
         : null;
+    const isSelection = subset !== null;
 
     const nodesToLayout = subset
         ? input.nodes.filter(n => subset.has(n.id))
         : input.nodes;
 
     if (nodesToLayout.length === 0) return [];
-
-    // Single node — no work to do, return it in place.
     if (nodesToLayout.length === 1) {
         const n = nodesToLayout[0];
         return [{ id: n.id, x: n.x, y: n.y }];
     }
 
+    const sizeFor = buildSizeFor(nodesToLayout, input.sizeOverrides);
+
     let computed: Positioned[];
     switch (strategy) {
-        case 'grid':
-            computed = gridLayout(nodesToLayout, { gutterX: opts.gutterX, gutterY: opts.gutterY });
+        case 'grid': {
+            computed = gridLayout(nodesToLayout, sizeFor, {
+                gutterX: opts.gutterX,
+                gutterY: opts.gutterY,
+            });
             break;
-        case 'hierarchy':
-            computed = hierarchyLayout(nodesToLayout, input.edges, {
+        }
+        case 'tidy':
+        default: {
+            computed = tidyLayout(nodesToLayout, input.edges, sizeFor, {
                 gutterX: opts.gutterX,
                 gutterY: opts.gutterY,
                 orientation: opts.orientation,
+                componentGap: opts.componentGap,
             });
             break;
-        case 'flow':
-            computed = flowLayout(nodesToLayout, input.edges, {
-                gutterX: opts.gutterX,
-                gutterY: opts.gutterY,
-            });
-            break;
-        case 'cluster':
-        default:
-            computed = clusterLayout(nodesToLayout, input.edges, {
-                gutterX: opts.gutterX,
-                gutterY: opts.gutterY,
-                clusterGap: opts.clusterGap,
-                seed: opts.seed,
-            });
-            break;
+        }
     }
 
-    // Soft-preserve: keep the layout's centroid near where it was.
-    if (opts.preserveRelative) {
-        computed = preserveCentroid(nodesToLayout, computed);
-    }
-
-    // Hard safety net: resolve any residual overlaps.
-    const sizes = buildSizeMap(nodesToLayout);
-    computed = resolveOverlaps(computed, sizes, Math.min(opts.gutterX, opts.gutterY) / 2);
-
-    return computed;
+    return anchorLayout({
+        original: nodesToLayout,
+        computed,
+        sizeFor,
+        isSelection,
+        viewportCenter: input.viewportCenter,
+    });
 }

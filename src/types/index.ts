@@ -121,7 +121,8 @@ export interface WorkspaceSettings {
     theme?: 'dark' | 'light';
     geminiApiKey?: string;
     geminiStatus?: GeminiConnectionStatus;
-    preferredLayoutStrategy?: 'cluster' | 'grid' | 'hierarchy' | 'flow';
+    preferredLayoutStrategy?: 'tidy' | 'grid';
+    preferredLayoutOrientation?: 'top-down' | 'left-right';
     [key: string]: any;
 }
 

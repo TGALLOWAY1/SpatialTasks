@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { ChevronRight, Home, Undo2, Redo2, Trash2, BoxSelect, Link, Menu, LayoutGrid, List, Crosshair, MoreVertical, Eye, Zap, Maximize2, Wand2, Sparkles, Grid3x3, Network, GitBranch } from 'lucide-react';
+import { ChevronRight, Home, Undo2, Redo2, Trash2, BoxSelect, Link, Menu, LayoutGrid, List, Crosshair, MoreVertical, Eye, Zap, Maximize2, Wand2, Grid3x3, Network, ArrowDown, ArrowRight } from 'lucide-react';
+import type { LayoutOrientation } from '../../layout/layoutTypes';
 import { clsx } from 'clsx';
 import { useStore } from 'zustand';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
@@ -230,34 +231,7 @@ export const TopBar: React.FC = () => {
                                     <Wand2 className="w-3 h-3" />
                                     Auto-Organize
                                 </div>
-                                <button
-                                    onClick={() => { dispatchCanvasAction({ type: 'auto-organize', strategy: 'cluster' }); setOverflowOpen(false); }}
-                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left text-gray-300 hover:bg-gray-700 transition-colors"
-                                >
-                                    <Sparkles className="w-4 h-4 flex-shrink-0" />
-                                    Cluster (smart)
-                                </button>
-                                <button
-                                    onClick={() => { dispatchCanvasAction({ type: 'auto-organize', strategy: 'grid' }); setOverflowOpen(false); }}
-                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left text-gray-300 hover:bg-gray-700 transition-colors"
-                                >
-                                    <Grid3x3 className="w-4 h-4 flex-shrink-0" />
-                                    Grid
-                                </button>
-                                <button
-                                    onClick={() => { dispatchCanvasAction({ type: 'auto-organize', strategy: 'hierarchy' }); setOverflowOpen(false); }}
-                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left text-gray-300 hover:bg-gray-700 transition-colors"
-                                >
-                                    <Network className="w-4 h-4 flex-shrink-0" />
-                                    Hierarchy
-                                </button>
-                                <button
-                                    onClick={() => { dispatchCanvasAction({ type: 'auto-organize', strategy: 'flow' }); setOverflowOpen(false); }}
-                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left text-gray-300 hover:bg-gray-700 transition-colors"
-                                >
-                                    <GitBranch className="w-4 h-4 flex-shrink-0" />
-                                    Flow
-                                </button>
+                                <AutoOrganizeOverflowEntries onClose={() => setOverflowOpen(false)} />
 
                                 <div className="border-t border-gray-700 my-1" />
 
@@ -338,5 +312,70 @@ export const TopBar: React.FC = () => {
             </div>
         )}
         </div>
+    );
+};
+
+const AutoOrganizeOverflowEntries: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+    const dispatchCanvasAction = useWorkspaceStore(s => s.dispatchCanvasAction);
+    const updateSettings = useWorkspaceStore(s => s.updateSettings);
+    const orientation: LayoutOrientation = useWorkspaceStore(s => s.settings.preferredLayoutOrientation) ?? 'top-down';
+
+    const setOrientation = (o: LayoutOrientation) => updateSettings({ preferredLayoutOrientation: o });
+    const run = (strategy: 'tidy' | 'grid') => {
+        updateSettings({ preferredLayoutStrategy: strategy });
+        dispatchCanvasAction({
+            type: 'auto-organize',
+            strategy,
+            orientation: strategy === 'tidy' ? orientation : undefined,
+        });
+        onClose();
+    };
+
+    return (
+        <>
+            <button
+                onClick={() => run('tidy')}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left text-gray-300 hover:bg-gray-700 transition-colors"
+            >
+                <Network className="w-4 h-4 flex-shrink-0" />
+                Tidy
+            </button>
+            <button
+                onClick={() => run('grid')}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left text-gray-300 hover:bg-gray-700 transition-colors"
+            >
+                <Grid3x3 className="w-4 h-4 flex-shrink-0" />
+                Grid
+            </button>
+            <div className="px-4 py-2 flex items-center gap-1.5">
+                <span className="text-[10px] uppercase tracking-wide text-gray-500 mr-1">Tidy:</span>
+                <button
+                    onClick={() => setOrientation('top-down')}
+                    className={clsx(
+                        'flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors touch:min-h-[32px]',
+                        orientation === 'top-down'
+                            ? 'bg-gray-700 text-white'
+                            : 'text-gray-400 hover:text-gray-200 bg-gray-900',
+                    )}
+                    aria-pressed={orientation === 'top-down'}
+                    aria-label="Top-down"
+                >
+                    <ArrowDown className="w-3 h-3" /> TB
+                </button>
+                <button
+                    onClick={() => setOrientation('left-right')}
+                    className={clsx(
+                        'flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors touch:min-h-[32px]',
+                        orientation === 'left-right'
+                            ? 'bg-gray-700 text-white'
+                            : 'text-gray-400 hover:text-gray-200 bg-gray-900',
+                    )}
+                    aria-pressed={orientation === 'left-right'}
+                    aria-label="Left-right"
+                >
+                    <ArrowRight className="w-3 h-3" /> LR
+                </button>
+            </div>
+        </>
     );
 };
