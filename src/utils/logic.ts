@@ -5,11 +5,15 @@ import { Graph, Node, Workspace } from '../types';
  * Action nodes use `status === 'done'`. Containers derive completion
  * from child-graph progress — they are complete when all leaf children are done.
  */
+function getContainerProgressFromGraphs(containerNode: Node, graphs?: Record<string, Graph>): number {
+    if (!graphs) return 0;
+    return getContainerProgress(containerNode, { graphs } as Workspace);
+}
+
 function isDependencySatisfied(sourceNode: Node, graphs?: Record<string, Graph>): boolean {
     if (sourceNode.status === 'done') return true;
-    if (sourceNode.type === 'container' && graphs) {
-        const progress = getContainerProgress(sourceNode, { graphs } as Workspace);
-        if (progress >= 1) return true;
+    if (sourceNode.type === 'container') {
+        return getContainerProgressFromGraphs(sourceNode, graphs) >= 1;
     }
     return false;
 }
@@ -41,7 +45,7 @@ export function getBlockingNodes(node: Node, graph: Graph, graphs?: Record<strin
         if (isDependencySatisfied(sourceNode, graphs)) continue;
 
         if (sourceNode.type === 'container' && graphs) {
-            const progress = getContainerProgress(sourceNode, { graphs } as Workspace);
+            const progress = getContainerProgressFromGraphs(sourceNode, graphs);
             blockers.push({ nodeId: sourceNode.id, reason: 'partial-container', progress });
         } else {
             blockers.push({ nodeId: sourceNode.id, reason: 'incomplete' });
@@ -91,8 +95,7 @@ export function getContainerProgress(containerNode: Node, workspace: Workspace):
  */
 export function isNodeActionable(node: Node, graph: Graph, graphs?: Record<string, Graph>): boolean {
     if (node.type === 'container' && graphs) {
-        const progress = getContainerProgress(node, { graphs } as Workspace);
-        if (progress >= 1) return false;
+        if (getContainerProgressFromGraphs(node, graphs) >= 1) return false;
     } else {
         if (node.status === 'done') return false;
     }
