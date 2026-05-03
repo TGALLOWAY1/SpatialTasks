@@ -594,6 +594,8 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 }
             }, 100);
         }
+        // setHasSelection is a stable Zustand action setter; omitting it is intentional.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pendingCanvasAction, clearCanvasAction, deleteSelected, handleFitView, activeGraphId, reactFlowInstance, batchUpdatePositions]);
 
     // (hasSelection tracked via store's setHasSelection)
