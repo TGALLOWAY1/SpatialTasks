@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Node, Graph } from '../../types';
 import { isNodeBlocked, getContainerProgress } from '../../utils/logic';
+import { topoSortWithDepth } from '../../utils/graphTraversal';
 import {
     CheckCircle2, Circle, Clock, Lock, Layers, ArrowRightCircle,
     Pencil, Sparkles, Loader2, ChevronRight, ChevronDown, GitBranch, Trash2, EyeOff, Eye,
@@ -33,67 +34,6 @@ const StatusIcon = ({ status, blocked, size = 'sm' }: { status?: string; blocked
         default: return <Circle className={clsx(cls, 'text-gray-500')} />;
     }
 };
-
-/**
- * Topological sort of nodes based on edges, grouping parallel tasks by depth.
- * Returns an array of { node, depth } where depth indicates dependency level.
- */
-function topoSortWithDepth(graph: Graph): { node: Node; depth: number }[] {
-    const nodeMap = new Map(graph.nodes.map(n => [n.id, n]));
-    const inDegree = new Map<string, number>();
-    const adj = new Map<string, string[]>();
-    const depthMap = new Map<string, number>();
-
-    for (const n of graph.nodes) {
-        inDegree.set(n.id, 0);
-        adj.set(n.id, []);
-    }
-    for (const e of graph.edges) {
-        if (nodeMap.has(e.source) && nodeMap.has(e.target)) {
-            adj.get(e.source)!.push(e.target);
-            inDegree.set(e.target, (inDegree.get(e.target) ?? 0) + 1);
-        }
-    }
-
-    // BFS-based topological sort with depth tracking
-    const queue: string[] = [];
-    for (const [id, deg] of inDegree) {
-        if (deg === 0) {
-            queue.push(id);
-            depthMap.set(id, 0);
-        }
-    }
-
-    const sorted: string[] = [];
-    while (queue.length > 0) {
-        const id = queue.shift()!;
-        sorted.push(id);
-        const currentDepth = depthMap.get(id) ?? 0;
-        for (const neighbor of adj.get(id) ?? []) {
-            const newDeg = (inDegree.get(neighbor) ?? 1) - 1;
-            inDegree.set(neighbor, newDeg);
-            // Take max depth from all predecessors
-            depthMap.set(neighbor, Math.max(depthMap.get(neighbor) ?? 0, currentDepth + 1));
-            if (newDeg === 0) {
-                queue.push(neighbor);
-            }
-        }
-    }
-
-    // Include any nodes not in the sorted result (disconnected/cycle)
-    const sortedSet = new Set(sorted);
-    for (const n of graph.nodes) {
-        if (!sortedSet.has(n.id)) {
-            sorted.push(n.id);
-            depthMap.set(n.id, 0);
-        }
-    }
-
-    return sorted.map(id => ({
-        node: nodeMap.get(id)!,
-        depth: depthMap.get(id) ?? 0,
-    }));
-}
 
 /**
  * Check how many nodes share the same depth (parallel tasks).
@@ -224,7 +164,7 @@ const ContainerItem: React.FC<{
     const [showExpandConfirm, setShowExpandConfirm] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-    const progress = useMemo(() => getContainerProgress(node, { graphs } as any), [node, graphs]);
+    const progress = useMemo(() => getContainerProgress(node, graphs), [node, graphs]);
     const hasApiKey = !!settings.geminiApiKey;
     const hasExistingChildren = !!(node.childGraphId && graphs[node.childGraphId]?.nodes.length > 0);
     const percentage = Math.round(progress * 100);
@@ -445,7 +385,7 @@ const ExpandedChildren: React.FC<{
         return items.filter(({ node }) => {
             if (node.type === 'action') return node.status !== 'done';
             if (node.type === 'container' && node.childGraphId) {
-                const progress = getContainerProgress(node, { graphs } as any);
+                const progress = getContainerProgress(node, graphs);
                 return progress < 1;
             }
             return true;
@@ -542,7 +482,7 @@ export const ListView: React.FC = () => {
         return items.filter(({ node }) => {
             if (node.type === 'action') return node.status !== 'done';
             if (node.type === 'container' && node.childGraphId) {
-                const progress = getContainerProgress(node, { graphs } as any);
+                const progress = getContainerProgress(node, graphs);
                 return progress < 1;
             }
             return true;

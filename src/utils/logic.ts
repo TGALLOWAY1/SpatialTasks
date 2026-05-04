@@ -1,19 +1,10 @@
-import { Graph, Node, Workspace } from '../types';
-
-/**
- * Whether an upstream node is "complete" for dependency purposes.
- * Action nodes use `status === 'done'`. Containers derive completion
- * from child-graph progress — they are complete when all leaf children are done.
- */
-function getContainerProgressFromGraphs(containerNode: Node, graphs?: Record<string, Graph>): number {
-    if (!graphs) return 0;
-    return getContainerProgress(containerNode, { graphs } as Workspace);
-}
+import { Graph, Node } from '../types';
 
 function isDependencySatisfied(sourceNode: Node, graphs?: Record<string, Graph>): boolean {
     if (sourceNode.status === 'done') return true;
     if (sourceNode.type === 'container') {
-        return getContainerProgressFromGraphs(sourceNode, graphs) >= 1;
+        if (!graphs) return false;
+        return getContainerProgress(sourceNode, graphs) >= 1;
     }
     return false;
 }
@@ -45,7 +36,7 @@ export function getBlockingNodes(node: Node, graph: Graph, graphs?: Record<strin
         if (isDependencySatisfied(sourceNode, graphs)) continue;
 
         if (sourceNode.type === 'container' && graphs) {
-            const progress = getContainerProgressFromGraphs(sourceNode, graphs);
+            const progress = getContainerProgress(sourceNode, graphs);
             blockers.push({ nodeId: sourceNode.id, reason: 'partial-container', progress });
         } else {
             blockers.push({ nodeId: sourceNode.id, reason: 'incomplete' });
@@ -67,21 +58,18 @@ export function isNodeBlocked(node: Node, graph: Graph, graphs?: Record<string, 
 
 /**
  * Calculates the progress of a container node based on its child graph.
- * Returns a number between 0 and 1.
+ * Returns a number between 0 and 1. Counts only immediate `action` leaves
+ * in the child graph (containers nested inside the child graph do not
+ * contribute to this rollup).
  */
-export function getContainerProgress(containerNode: Node, workspace: Workspace): number {
+export function getContainerProgress(containerNode: Node, graphs: Record<string, Graph>): number {
     if (containerNode.type !== 'container' || !containerNode.childGraphId) return 0;
 
-    const childGraph = workspace.graphs[containerNode.childGraphId];
+    const childGraph = graphs[containerNode.childGraphId];
     if (!childGraph) return 0;
 
     const leafNodes = childGraph.nodes.filter(n => n.type === 'action');
-    if (leafNodes.length === 0) return 0; // Or 1? Empty graph = done? Let's say 0 for now.
-
-    // Recursive progress? Or just immediate children?
-    // "Roll-up: Progress = (# done leaf nodes) / (# total leaf nodes) in that subgraph"
-    // "or include containers too"
-    // Let's stick to simple leaf node count for now as per prompt example.
+    if (leafNodes.length === 0) return 0;
 
     const doneCount = leafNodes.filter(n => n.status === 'done').length;
     return doneCount / leafNodes.length;
@@ -95,7 +83,7 @@ export function getContainerProgress(containerNode: Node, workspace: Workspace):
  */
 export function isNodeActionable(node: Node, graph: Graph, graphs?: Record<string, Graph>): boolean {
     if (node.type === 'container' && graphs) {
-        if (getContainerProgressFromGraphs(node, graphs) >= 1) return false;
+        if (getContainerProgress(node, graphs) >= 1) return false;
     } else {
         if (node.status === 'done') return false;
     }

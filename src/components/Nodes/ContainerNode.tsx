@@ -68,7 +68,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<SpatialNode>) =
     }, [autoEditNodeId, data.id, data.title, setAutoEditNodeId]);
 
     const progress = useMemo(() => {
-        return getContainerProgress(data, { graphs } as any);
+        return getContainerProgress(data, graphs);
     }, [data, graphs]);
 
     const blockers = useMemo(() => {
