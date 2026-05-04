@@ -7,7 +7,7 @@ import { createProjectFromDraft } from '../../utils/draftUtils';
 import { PLAN_TEMPLATES, AI_PROMPT_TEMPLATE } from '../../utils/planTemplates';
 import {
     FileUp, Upload, ClipboardPaste, X, AlertTriangle, FileText,
-    LayoutTemplate, Sparkles, Copy, ExternalLink,
+    LayoutTemplate, Sparkles, Copy, ExternalLink, Check,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -31,6 +31,7 @@ export const MarkdownImporter: React.FC<MarkdownImporterProps> = ({ open, onClos
     const [fileName, setFileName] = useState('');
     const [aiGoal, setAiGoal] = useState('');
     const [copied, setCopied] = useState(false);
+    const [copiedTemplateId, setCopiedTemplateId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const addToast = useToastStore(state => state.addToast);
 
@@ -45,6 +46,7 @@ export const MarkdownImporter: React.FC<MarkdownImporterProps> = ({ open, onClos
         setFileName('');
         setAiGoal('');
         setCopied(false);
+        setCopiedTemplateId(null);
         onClose();
     }, [onClose]);
 
@@ -121,6 +123,21 @@ export const MarkdownImporter: React.FC<MarkdownImporterProps> = ({ open, onClos
         setPasteContent(tpl.markdown);
         setActiveTab('paste');
         addToast(`Loaded "${tpl.label}" template — edit below then Parse & Review.`, 'success');
+    }, [addToast]);
+
+    const handleCopyTemplate = useCallback(async (templateId: string) => {
+        const tpl = PLAN_TEMPLATES.find(t => t.id === templateId);
+        if (!tpl) return;
+        try {
+            await navigator.clipboard.writeText(tpl.markdown);
+            setCopiedTemplateId(templateId);
+            addToast(`Copied "${tpl.label}" — paste it into a coding agent or the Paste tab.`, 'success');
+            window.setTimeout(() => {
+                setCopiedTemplateId(prev => (prev === templateId ? null : prev));
+            }, 2000);
+        } catch {
+            addToast('Could not access the clipboard. Open the template and copy manually.', 'error');
+        }
     }, [addToast]);
 
     const handleCopyPrompt = useCallback(async () => {
@@ -307,18 +324,45 @@ export const MarkdownImporter: React.FC<MarkdownImporterProps> = ({ open, onClos
                     {activeTab === 'template' && (
                         <div className="space-y-2">
                             <p className="text-xs text-slate-400 mb-2">
-                                Pick a starter template. It loads into the Paste tab so you can edit before parsing.
+                                Pick a starter template — click the card to load it into the Paste tab, or use the copy icon to grab the markdown for a coding agent.
                             </p>
-                            {PLAN_TEMPLATES.map(tpl => (
-                                <button
-                                    key={tpl.id}
-                                    onClick={() => handleTemplateSelect(tpl.id)}
-                                    className="w-full text-left bg-slate-900/50 hover:bg-slate-900 border border-slate-700 hover:border-emerald-500 rounded-lg p-3 transition-colors"
-                                >
-                                    <div className="text-sm font-semibold text-white">{tpl.label}</div>
-                                    <div className="text-xs text-slate-400 mt-0.5">{tpl.description}</div>
-                                </button>
-                            ))}
+                            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                                {PLAN_TEMPLATES.map(tpl => {
+                                    const isCopied = copiedTemplateId === tpl.id;
+                                    return (
+                                        <div
+                                            key={tpl.id}
+                                            className="group relative flex items-stretch bg-slate-900/50 hover:bg-slate-900 border border-slate-700 hover:border-emerald-500 rounded-lg transition-colors"
+                                        >
+                                            <button
+                                                onClick={() => handleTemplateSelect(tpl.id)}
+                                                className="flex-1 text-left p-3 pr-2 min-w-0"
+                                            >
+                                                <div className="text-sm font-semibold text-white">{tpl.label}</div>
+                                                <div className="text-xs text-slate-400 mt-0.5">{tpl.description}</div>
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleCopyTemplate(tpl.id);
+                                                }}
+                                                title={isCopied ? 'Copied!' : 'Copy markdown to clipboard'}
+                                                aria-label={`Copy ${tpl.label} markdown to clipboard`}
+                                                className={clsx(
+                                                    "shrink-0 self-center mr-2 p-2 rounded-md border transition-colors",
+                                                    isCopied
+                                                        ? "border-emerald-500 bg-emerald-900/40 text-emerald-300"
+                                                        : "border-slate-700 bg-slate-800/60 text-slate-400 hover:text-emerald-300 hover:border-emerald-500 hover:bg-slate-800",
+                                                )}
+                                            >
+                                                {isCopied
+                                                    ? <Check className="w-4 h-4" />
+                                                    : <Copy className="w-4 h-4" />}
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     )}
 
