@@ -35,7 +35,7 @@ No URL router — single-page app with in-memory navigation stack.
 ### Canvas & Nodes
 | Component | File | Purpose |
 |-----------|------|---------|
-| CanvasArea | `src/components/Canvas/CanvasArea.tsx` | ReactFlow canvas, pan/zoom, shortcuts, touch gestures |
+| CanvasArea | `src/components/Canvas/CanvasArea.tsx` | ReactFlow canvas, pan/zoom, shortcuts, touch gestures, edge create/rewire flow |
 | BlockedSpotlight | `src/components/Canvas/BlockedSpotlight.tsx` | Predecessor-trace overlay: pulse rings on blockers + chip bar / bottom sheet |
 | LayoutMenu | `src/components/Canvas/LayoutMenu.tsx` | Toolbar popover for Auto-Organize: picks Tidy or Grid + Top-down/Left-right orientation toggle, optional selection-only scope, remembers last used strategy + orientation |
 | ActionNode | `src/components/Nodes/ActionNode.tsx` | Task node: status cycle, inline edit, resize, notes, images, interactive blocked badge |
@@ -122,12 +122,14 @@ No URL router — single-page app with in-memory navigation stack.
 | Delete folder | `deleteFolder(id, { deleteProjects })` | Either moves inner projects to root (Keep) or cascades deletion of projects + descendant graphs (Delete Too); Delete Too is blocked if it would empty the workspace |
 | Add node | `addNode(node)` | Adds to active graph; sets `autoEditNodeId` for keyboard/context-menu creation |
 | Update node | `updateNode(id, data)` | Partial update |
+| Convert action to container | `convertNodeToContainer(id)` | Switches an action node to container presentation in place, clears action status, preserves title/position/metadata/edges |
 | Remove node | `removeNode(id)` | Removes edges + child graphs recursively |
 | Batch remove | `removeNodes(ids[])` | Batch with cleanup |
 | Cycle status | `cycleNodeStatus(id)` | todo → in_progress → done → todo |
 | Batch positions | `batchUpdatePositions(updates[])` | Drag optimization; also used to commit Auto-Organize results as a single undo entry |
 | Auto-organize canvas | dispatch `{type:'auto-organize', strategy, orientation?, nodeIds?}` → `computeLayout()` → `batchUpdatePositions()` | Two strategies: **Tidy** (dagre Sugiyama; falls back to component-packed grid when subset has no internal edges) and **Grid** (deterministic row-pack sorted by current y/x). TB/LR orientation toggle (Tidy only). Live `width`/`height` from RF passed via `sizeOverrides` so resized containers pack correctly. Anchored to selection bbox or viewport center — no surprise camera jumps; `fitView` only when result spans outside the visible flow rect. Animated via rfInstance.setNodes; nodeIds=[] = selection only; remembers last strategy/orientation in `settings.preferredLayoutStrategy` + `settings.preferredLayoutOrientation`. Legacy values (`cluster`/`hierarchy`/`flow`) migrated on rehydrate. |
 | Add edge | `addEdge(edge)` | Connection between nodes |
+| Update edge | `updateEdge(id, data, graphId?)` | Rewire an existing dependency without recreating it |
 | Remove edge | `removeEdge(id)` | Single edge removal |
 | Enter graph | `enterGraph(graphId, nodeId, label)` | Push navStack |
 | Navigate back | `navigateBack(steps?)` | Pop navStack |
@@ -179,6 +181,7 @@ No URL router — single-page app with in-memory navigation stack.
 | Long-press (500ms) | Action sheet | On nodes, edges, pane; vibration feedback |
 | Swipe right from left edge | Navigate back | 50px start, 100px threshold |
 | Tap node (connect mode) | Start/complete connection | Two-tap flow |
+| Tap node (edge edit mode) | Reconnect selected dependency endpoint | Uses highlighted anchor node + TopBar instruction banner |
 | Pinch | Zoom | ReactFlow native |
 | Pan drag | Pan canvas | ReactFlow native |
 | Status tap | Cycle status | With vibration |

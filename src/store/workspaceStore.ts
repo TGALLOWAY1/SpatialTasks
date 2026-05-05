@@ -23,7 +23,13 @@ interface WorkspaceState extends Workspace {
     _supabaseLoaded: boolean;
     selectMode: boolean;
     _hasSelection: boolean;
-    connectMode: { active: boolean; sourceNodeId?: string };
+    connectMode: {
+        active: boolean;
+        sourceNodeId?: string;
+        edgeId?: string;
+        endpoint?: 'source' | 'target';
+        anchorNodeId?: string;
+    };
     autoEditNodeId: string | null;
     sidebarOpen: boolean;
     viewMode: 'graph' | 'list' | 'focus';
@@ -46,6 +52,7 @@ interface WorkspaceState extends Workspace {
     setHasSelection: (v: boolean) => void;
     toggleConnectMode: () => void;
     setConnectSource: (nodeId: string) => void;
+    startEdgeReconnect: (edgeId: string, endpoint: 'source' | 'target', anchorNodeId: string) => void;
     clearConnectMode: () => void;
     setAutoEditNodeId: (nodeId: string | null) => void;
     toggleSidebar: () => void;
@@ -81,9 +88,11 @@ interface WorkspaceState extends Workspace {
     // Graph edits
     addNode: (node: Node) => void;
     updateNode: (nodeId: string, data: Partial<Node>, graphId?: string) => void;
+    convertNodeToContainer: (nodeId: string, graphId?: string) => void;
     setNodeColor: (nodeId: string, color: AccentColor | null, graphId?: string) => void;
     removeNode: (nodeId: string, graphId?: string) => void;
     removeEdge: (edgeId: string) => void;
+    updateEdge: (edgeId: string, data: Partial<Edge>, graphId?: string) => void;
     removeNodes: (nodeIds: string[]) => void;
     cycleNodeStatus: (nodeId: string, graphId?: string) => void;
     batchUpdateNodes: (nodeIds: string[], data: Partial<Node>) => void;
@@ -142,6 +151,17 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             setConnectSource: (nodeId: string) => {
                 set({ connectMode: { active: true, sourceNodeId: nodeId } });
+            },
+
+            startEdgeReconnect: (edgeId, endpoint, anchorNodeId) => {
+                set({
+                    connectMode: {
+                        active: true,
+                        edgeId,
+                        endpoint,
+                        anchorNodeId,
+                    },
+                });
             },
 
             clearConnectMode: () => {
@@ -473,6 +493,33 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 });
             },
 
+            convertNodeToContainer: (nodeId, graphId?) => {
+                const { activeGraphId, graphs } = get();
+                const targetGraphId = graphId || activeGraphId;
+                if (!targetGraphId) return;
+
+                const graph = graphs[targetGraphId];
+                if (!graph) return;
+
+                const node = graph.nodes.find(n => n.id === nodeId);
+                if (!node || node.type !== 'action') return;
+
+                const updatedNodes = graph.nodes.map(n =>
+                    n.id === nodeId
+                        ? {
+                            ...n,
+                            type: 'container' as const,
+                            status: undefined,
+                            height: Math.max(n.height ?? 50, 80),
+                        }
+                        : n
+                );
+
+                set({
+                    graphs: { ...graphs, [targetGraphId]: { ...graph, nodes: updatedNodes } }
+                });
+            },
+
             setNodeColor: (nodeId, color, graphId?) => {
                 const { activeGraphId, graphs } = get();
                 const targetGraphId = graphId || activeGraphId;
@@ -539,6 +586,27 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         [activeGraphId]: {
                             ...graph,
                             edges: graph.edges.filter(e => e.id !== edgeId)
+                        }
+                    }
+                });
+            },
+
+            updateEdge: (edgeId, data, graphId?) => {
+                const { activeGraphId, graphs } = get();
+                const targetGraphId = graphId || activeGraphId;
+                if (!targetGraphId) return;
+
+                const graph = graphs[targetGraphId];
+                if (!graph) return;
+
+                set({
+                    graphs: {
+                        ...graphs,
+                        [targetGraphId]: {
+                            ...graph,
+                            edges: graph.edges.map(edge =>
+                                edge.id === edgeId ? { ...edge, ...data } : edge
+                            )
                         }
                     }
                 });

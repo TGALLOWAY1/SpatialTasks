@@ -307,9 +307,13 @@ export const TopBar: React.FC = () => {
                 <div className="flex items-center gap-2 text-xs text-purple-200">
                     <Link className="w-3.5 h-3.5 animate-pulse" />
                     <span>
-                        {connectMode.sourceNodeId
-                            ? 'Tap a target node to create a connection'
-                            : 'Tap a source node to start connecting'}
+                        {connectMode.edgeId
+                            ? connectMode.endpoint === 'source'
+                                ? 'Tap the task that should now be the prerequisite for this dependency'
+                                : 'Tap the task that should now be unlocked by this dependency'
+                            : connectMode.sourceNodeId
+                                ? 'Tap a target node to create a connection'
+                                : 'Tap a source node to start connecting'}
                     </span>
                 </div>
                 <button

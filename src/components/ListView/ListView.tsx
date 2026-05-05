@@ -49,6 +49,7 @@ function getParallelCounts(items: { node: Node; depth: number }[]): Map<number, 
 const ActionItem: React.FC<{ node: Node; blocked: boolean; depth: number; isParallel: boolean; graphId?: string }> = ({ node, blocked, depth, isParallel, graphId }) => {
     const cycleNodeStatus = useWorkspaceStore(state => state.cycleNodeStatus);
     const updateNode = useWorkspaceStore(state => state.updateNode);
+    const convertNodeToContainer = useWorkspaceStore(state => state.convertNodeToContainer);
     const removeNode = useWorkspaceStore(state => state.removeNode);
     const [editing, setEditing] = useState(false);
     const [editValue, setEditValue] = useState(node.title);
@@ -128,6 +129,13 @@ const ActionItem: React.FC<{ node: Node; blocked: boolean; depth: number; isPara
                     <Pencil className="w-3.5 h-3.5" />
                 </button>
             )}
+            <button
+                onClick={() => convertNodeToContainer(node.id, graphId)}
+                className="text-slate-500 hover:text-indigo-300 transition-colors flex-shrink-0 touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"
+                title="Convert to container"
+            >
+                <Layers className="w-3.5 h-3.5" />
+            </button>
             <button
                 onClick={() => removeNode(node.id, graphId)}
                 className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0 touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:items-center touch:justify-center"

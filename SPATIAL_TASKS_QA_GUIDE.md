@@ -165,9 +165,9 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 
 ---
 
-### Flow 6: Connecting Nodes (Edge Creation)
+### Flow 6: Connecting and Editing Dependencies
 
-**What the user is doing**: Creating dependency/flow links between tasks.
+**What the user is doing**: Creating or rewiring dependency/flow links between tasks.
 
 **Happy path (desktop)**:
 1. Drag from source handle to target handle → edge appears
@@ -178,12 +178,20 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 2. Tap source node → instruction banner updates to "Now tap target"
 3. Tap target node → edge created → connect mode exits
 
+**Happy path (editing an existing dependency)**:
+1. Right-click an edge on desktop, or long-press it on touch
+2. Choose `Change Prerequisite` or `Change Unlocked Step`
+3. Tap the replacement node
+4. The existing edge is rewired without deleting and recreating it manually
+
 **What could go wrong**:
 - Self-connection allowed (source = target)
 - Duplicate edges created between same pair
 - Connect mode doesn't exit after creating edge
 - Connect mode disables drag but user doesn't realize why dragging stopped working
 - Edge renders on wrong nodes after deletion/recreation
+- Rewired edges allow a self-loop or silently create duplicate dependencies
+- Edge edit mode highlights the wrong anchor node or never exits after a reconnect
 
 **Why it matters**: Connections define task dependencies and blocking logic.
 
@@ -517,6 +525,7 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 | QA-A019j | Visual References | Images survive Supabase sync | Signed in with Supabase configured; image uploaded and SaveIndicator shows "Saved" | 1. Open the same workspace in a second browser/incognito window signed into the same account | Images appear on the same node with the same data | Base64 payload round-trips through Supabase JSONB without truncation | P2 |
 | QA-A019k | Visual References | Read-only view when node deselected | Node with images; panel open | 1. Click the canvas to deselect the node | Thumbnails remain visible; "Add" button and per-thumbnail remove icons are hidden | The panel close (X) button remains available; clicking a thumbnail still opens the lightbox | P1 |
 | QA-A019l | Visual References | Visual References on ContainerNode | A selected ContainerNode | 1. Click the Image button (bottom-left) 2. Upload an image | Panel renders with indigo accent matching the container's theme; image is attached to the container | Container's Magic Expand still sees `meta.notes` unchanged; image does not interfere with container progress or enter-subgraph | P2 |
+| QA-A019m | Task Editing | Convert an action node to a container | An ActionNode exists with a title, optional metadata, and one or more dependencies | 1. Right-click the ActionNode (or long-press on touch) and choose "Convert to Container" 2. Verify the node restyles as a container 3. Open List View and convert another action via the Layers button | The action becomes a ContainerNode in place, preserving title, position, notes/images/color, and existing incoming/outgoing edges | Status controls should disappear after conversion; no child graph is created until the user explicitly enters the container | P1 |
 | QA-A020 | Drag & Reposition | Drag a single node to a new position | At least one ActionNode on canvas | 1. Click and hold the node 2. Drag it to a new position on the canvas 3. Release | Node moves smoothly to the new position and stays there | No snapping to wrong grid, no visual jitter during drag | P0 |
 | QA-A021 | Drag & Reposition | Dragged position persists after refresh | A node was just dragged to a new position | 1. Drag a node to a clearly different position 2. Note the position 3. Refresh the page | Node reappears at the dragged position, not the original position | batchUpdatePositions() must have fired and persisted successfully | P0 |
 | QA-A022 | Drag & Reposition | Drag is disabled in connect mode | Connect mode is active on the canvas | 1. Activate connect mode 2. Attempt to click and drag a node | Node does not move; instead, a connection handle/edge interaction begins or nothing happens | Node should not change position at all while connect mode is enabled | P1 |
@@ -559,9 +568,11 @@ User Action → Zustand Store Mutation → localStorage (immediate)
 | QA-B001 | Edge creation | Drag from source handle to target handle | Graph with at least 2 nodes visible | 1. Hover over source node to reveal handles. 2. Click and drag from a source handle (right side). 3. Drag to target handle (left side) of another node. 4. Release mouse. | A smoothstep edge appears connecting source to target. Edge is animated on desktop. Edge persists in state. | Handle highlight on hover; edge snaps to handle on release; no phantom edges left if dropping on empty canvas | P0 |
 | QA-B002 | Edge creation | Connect mode via TopBar toggle (desktop) | Graph with at least 2 nodes | 1. Click the connect mode toggle in TopBar. 2. Click source node. 3. Click target node. | Connect mode activates (visual indicator in TopBar). After tapping source, it highlights as selected. After tapping target, a smoothstep animated edge is created between them. Node dragging is disabled while connect mode is on. | Source highlight clears after connection; connect mode remains active for additional connections; cursor style change | P0 |
 | QA-B003 | Edge creation | Connect mode two-tap flow on mobile | Mobile device or emulator; graph with 2+ nodes | 1. Tap connect mode toggle in TopBar. 2. Tap source node. 3. Tap target node. | Edge created between source and target. Nodes cannot be dragged while connect mode is active. | Fat-finger tolerance; visual feedback on first tap; no accidental node moves | P0 |
+| QA-B003a | Edge editing | Rewire an existing dependency into a parallel branch | Graph with chain A -> B -> C and all three nodes visible | 1. Right-click or long-press edge B -> C. 2. Choose `Change Prerequisite`. 3. Tap node A. | The existing dependency updates from B -> C to A -> C, making B and C parallel successors of A. The edge edit banner clears after the reconnect. | No second edge is created; node dragging is restored when edit mode exits | P0 |
 | QA-B004 | Edge creation | Prevent self-connection | Graph with at least 1 node | 1. Drag from a node's source handle back to the same node's target handle. | No edge is created. No error shown to user but connection is silently rejected by addEdge. | No phantom edge left behind; no console errors | P1 |
 | QA-B005 | Edge creation | Prevent duplicate edge | Graph with 2 nodes already connected by an edge | 1. Drag from the same source handle to the same target handle that already has a connection. | No second edge is created. The existing edge remains unchanged. | No visual glitch or doubled edges; addEdge dedup logic fires correctly | P1 |
 | QA-B006 | Edge creation | Connect mode self-connection prevention | Connect mode active; graph with nodes | 1. Toggle connect mode on. 2. Tap a node as source. 3. Tap the same node as target. | No edge is created. Source selection resets or remains for a new target selection. | Clear feedback that self-connection was rejected | P1 |
+| QA-B006a | Edge editing | Reject invalid reconnect targets | Graph with A -> B and A -> C already present | 1. Right-click or long-press edge A -> B. 2. Choose `Change Unlocked Step`. 3. Tap node A. 4. Tap node C. | Step 3 is rejected because it would create a self-loop. Step 4 is rejected because A -> C already exists. In both cases the original edge remains unchanged. | User can keep trying without reopening the edge menu; feedback appears for both invalid cases | P1 |
 | QA-B007 | Edge deletion | Delete edge via Backspace key | Graph with at least 1 edge | 1. Click on an edge to select it (edge highlights). 2. Press Backspace. | Edge is removed from the graph. Connected nodes remain. | Selection visual clears after deletion; undo support if implemented; no orphan references in state | P0 |
 | QA-B008 | Edge deletion | Delete edge via context menu | Graph with at least 1 edge | 1. Right-click on an edge. 2. Select "Delete" from the context menu. | Edge is removed. Context menu closes. | Context menu positions correctly near the edge; menu dismisses on click-away without deleting | P0 |
 | QA-B009 | Edge deletion | Delete edge on mobile (long-press context menu) | Mobile device; graph with edge | 1. Long-press on an edge. 2. Tap "Delete" from context menu. | Edge is deleted. | Long-press duration feels natural; no accidental pan during long-press; context menu positioned within viewport | P1 |
