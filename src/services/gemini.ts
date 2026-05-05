@@ -19,6 +19,85 @@ export interface GenerateFlowResult {
     nodes: DraftNode[];
 }
 
+type GeminiResponseEnvelope = {
+    candidates?: Array<{
+        content?: {
+            parts?: Array<{ text?: string }>;
+        };
+    }>;
+};
+
+function buildGeminiError(status: number): GeminiError {
+    if (status === 400 || status === 403) {
+        return { type: 'invalid_key', message: 'Invalid API key. Check your Gemini key in settings.' };
+    }
+    if (status === 429) {
+        return { type: 'quota_exceeded', message: 'Quota exceeded. Try again later.' };
+    }
+
+    return { type: 'unknown', message: `API error: ${status}` };
+}
+
+async function requestGemini(apiKey: string, prompt: string): Promise<GeminiResponseEnvelope> {
+    const body = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.7,
+        },
+    };
+
+    let response: Response;
+    try {
+        response = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+    } catch {
+        throw { type: 'network', message: 'Network error. Check your connection.' } as GeminiError;
+    }
+
+    if (!response.ok) {
+        throw buildGeminiError(response.status);
+    }
+
+    return response.json() as Promise<GeminiResponseEnvelope>;
+}
+
+function getCandidateText(responseData: GeminiResponseEnvelope): string {
+    const text = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+        throw new Error('Missing candidate text');
+    }
+
+    return text;
+}
+
+function toDraftNodes(rawNodes: unknown[]): DraftNode[] {
+    let counter = 0;
+    const nodes: DraftNode[] = rawNodes.map((rawNode, nodeIndex) => {
+        const node = rawNode as { label?: string; children?: Array<{ label?: string }> };
+        const children = Array.isArray(node.children)
+            ? node.children.map((child, childIndex) => ({
+                id: `step-${counter++}`,
+                label: child.label || 'Untitled',
+                order: childIndex,
+                children: undefined,
+            }))
+            : undefined;
+
+        return {
+            id: `phase-${counter++}`,
+            label: node.label || 'Untitled Phase',
+            children,
+            order: nodeIndex,
+        };
+    });
+
+    return nodes;
+}
+
 export async function generateFlow(
     apiKey: string,
     userPrompt: string,
@@ -50,70 +129,16 @@ Rules:
 - Order phases logically
 - Return ONLY valid JSON, no other text`;
 
-    const body = {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.7,
-        },
-    };
-
-    let response: Response;
-    try {
-        response = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
-    } catch {
-        throw { type: 'network', message: 'Network error. Check your connection.' } as GeminiError;
-    }
-
-    if (!response.ok) {
-        if (response.status === 400 || response.status === 403) {
-            throw { type: 'invalid_key', message: 'Invalid API key. Check your Gemini key in settings.' } as GeminiError;
-        }
-        if (response.status === 429) {
-            throw { type: 'quota_exceeded', message: 'Quota exceeded. Try again later.' } as GeminiError;
-        }
-        throw { type: 'unknown', message: `API error: ${response.status}` } as GeminiError;
-    }
-
-    const data = await response.json();
+    const data = await requestGemini(apiKey, prompt);
 
     try {
-        const text = data.candidates[0].content.parts[0].text;
-        const parsed = JSON.parse(text);
+        const parsed = JSON.parse(getCandidateText(data)) as { title?: string; nodes?: unknown[] };
 
         if (!parsed.title || !Array.isArray(parsed.nodes) || parsed.nodes.length === 0) {
             throw new Error('Invalid response structure');
         }
 
-        // Normalize into DraftNode format with IDs and order
-        let counter = 0;
-        const nodes: DraftNode[] = parsed.nodes.map((n: any) => {
-            const parentId = `phase-${counter++}`;
-            const children = Array.isArray(n.children)
-                ? n.children.map((c: any) => ({
-                    id: `step-${counter++}`,
-                    label: c.label || 'Untitled',
-                    order: 0,
-                    children: undefined,
-                }))
-                : undefined;
-            if (children) {
-                children.forEach((c: DraftNode, i: number) => { c.order = i; });
-            }
-            return {
-                id: parentId,
-                label: n.label || 'Untitled Phase',
-                children,
-                order: 0,
-            } as DraftNode;
-        });
-        nodes.forEach((n: DraftNode, i: number) => { n.order = i; });
-
-        return { title: parsed.title, nodes };
+        return { title: parsed.title, nodes: toDraftNodes(parsed.nodes) };
     } catch {
         throw { type: 'parse_error', message: 'Failed to parse AI response. Try again.' } as GeminiError;
     }
@@ -142,40 +167,10 @@ Rules:
 - The first subtask should have no dependencies
 - Return ONLY the JSON array, no other text`;
 
-    const body = {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.7,
-        },
-    };
-
-    let response: Response;
-    try {
-        response = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
-    } catch {
-        throw { type: 'network', message: 'Network error. Check your connection.' } as GeminiError;
-    }
-
-    if (!response.ok) {
-        if (response.status === 400 || response.status === 403) {
-            throw { type: 'invalid_key', message: 'Invalid API key. Check your Gemini key in settings.' } as GeminiError;
-        }
-        if (response.status === 429) {
-            throw { type: 'quota_exceeded', message: 'Quota exceeded. Try again later.' } as GeminiError;
-        }
-        throw { type: 'unknown', message: `API error: ${response.status}` } as GeminiError;
-    }
-
-    const data = await response.json();
+    const data = await requestGemini(apiKey, prompt);
 
     try {
-        const text = data.candidates[0].content.parts[0].text;
-        const subtasks: GeminiSubtask[] = JSON.parse(text);
+        const subtasks: GeminiSubtask[] = JSON.parse(getCandidateText(data));
 
         if (!Array.isArray(subtasks) || subtasks.length === 0) {
             throw new Error('Empty response');
