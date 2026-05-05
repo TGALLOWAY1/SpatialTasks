@@ -55,7 +55,7 @@ const ExpandedNotesModal = ({ value, onChange, onSave, onClose, accentColor }: {
         >
             <div className="absolute inset-0 bg-black/60" />
             <div
-                className={`relative w-full sm:max-w-lg sm:rounded-xl rounded-t-2xl shadow-2xl border p-4 ${
+                className={`relative w-[calc(100vw-1rem)] sm:w-[min(92vw,64rem)] max-h-[calc(100dvh-1rem)] sm:max-h-[min(90dvh,56rem)] min-h-[min(75dvh,40rem)] sm:min-h-[min(85dvh,48rem)] sm:rounded-2xl rounded-t-2xl shadow-2xl border p-4 sm:p-5 flex flex-col ${
                     isIndigo
                         ? 'bg-indigo-950 border-indigo-700'
                         : 'bg-slate-900 border-slate-700'
@@ -94,7 +94,7 @@ const ExpandedNotesModal = ({ value, onChange, onSave, onClose, accentColor }: {
                 </div>
                 <textarea
                     ref={textareaRef}
-                    className={`w-full bg-transparent border rounded text-sm resize-none outline-none p-3 ${
+                    className={`w-full flex-1 min-h-[50vh] sm:min-h-[28rem] bg-transparent border rounded text-sm resize-none outline-none p-3 ${
                         isIndigo
                             ? 'border-indigo-800 text-indigo-100 placeholder-indigo-600 focus:border-indigo-500'
                             : 'border-slate-700 text-slate-200 placeholder-slate-600 focus:border-slate-500'
