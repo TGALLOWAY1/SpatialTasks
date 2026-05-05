@@ -21,6 +21,8 @@ export const TopBar: React.FC = () => {
     const connectMode = useWorkspaceStore(state => state.connectMode);
     const toggleConnectMode = useWorkspaceStore(state => state.toggleConnectMode);
     const toggleSidebar = useWorkspaceStore(state => state.toggleSidebar);
+    const activeProjectId = useWorkspaceStore(state => state.activeProjectId);
+    const loadProject = useWorkspaceStore(state => state.loadProject);
     const viewMode = useWorkspaceStore(state => state.viewMode);
     const setViewMode = useWorkspaceStore(state => state.setViewMode);
     const dispatchCanvasAction = useWorkspaceStore(state => state.dispatchCanvasAction);
@@ -45,6 +47,13 @@ export const TopBar: React.FC = () => {
             document.removeEventListener('touchstart', handleClick);
         };
     }, [overflowOpen]);
+
+    const handleFocusView = () => {
+        if (activeProjectId) {
+            loadProject(activeProjectId);
+        }
+        setViewMode('focus');
+    };
 
     return (
         <div>
@@ -111,7 +120,7 @@ export const TopBar: React.FC = () => {
                         <List className="w-4 h-4" />
                     </button>
                     <button
-                        onClick={() => setViewMode('focus')}
+                        onClick={handleFocusView}
                         className={clsx(
                             "p-1.5 rounded transition-colors touch:min-h-[44px] touch:min-w-[44px] touch:flex touch:flex-col touch:items-center touch:justify-center",
                             viewMode === 'focus'
@@ -204,7 +213,7 @@ export const TopBar: React.FC = () => {
                                             {viewMode === 'list' && <span className="ml-auto text-purple-400 text-xs">Active</span>}
                                         </button>
                                         <button
-                                            onClick={() => { setViewMode('focus'); setOverflowOpen(false); }}
+                                            onClick={() => { handleFocusView(); setOverflowOpen(false); }}
                                             className={clsx(
                                                 "flex items-center gap-3 w-full px-4 py-3 text-sm text-left hover:bg-gray-700 transition-colors",
                                                 viewMode === 'focus' ? "text-white" : "text-gray-300"
@@ -298,9 +307,13 @@ export const TopBar: React.FC = () => {
                 <div className="flex items-center gap-2 text-xs text-purple-200">
                     <Link className="w-3.5 h-3.5 animate-pulse" />
                     <span>
-                        {connectMode.sourceNodeId
-                            ? 'Tap a target node to create a connection'
-                            : 'Tap a source node to start connecting'}
+                        {connectMode.edgeId
+                            ? connectMode.endpoint === 'source'
+                                ? 'Tap the task that should now be the prerequisite for this dependency'
+                                : 'Tap the task that should now be unlocked by this dependency'
+                            : connectMode.sourceNodeId
+                                ? 'Tap a target node to create a connection'
+                                : 'Tap a source node to start connecting'}
                     </span>
                 </div>
                 <button

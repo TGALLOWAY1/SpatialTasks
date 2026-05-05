@@ -14,6 +14,7 @@ import 'reactflow/dist/style.css';
 import { clsx } from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useToastStore } from '../UI/Toast';
 import { ContainerNode } from '../Nodes/ContainerNode';
 import { ActionNode } from '../Nodes/ActionNode';
 import { ContextMenu, MenuItem } from '../UI/ContextMenu';
@@ -25,6 +26,7 @@ import { ACCENT_COLORS, ACCENT_BAR, ACCENT_LABEL } from '../../utils/accent';
 import type { AccentColor } from '../../types';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 import { isNodeActionable, getBlockingNodes, BlockingNodeInfo } from '../../utils/logic';
+import { getReconnectedEdge, validateEdgeConnection } from '../../utils/edgeEditing';
 import { StepDetailPanel } from '../ExecutionPanel/StepDetailPanel';
 import { BlockedSpotlight, useBlockingTitles } from './BlockedSpotlight';
 import { computeLayout } from '../../layout/layoutEngine';
@@ -50,8 +52,10 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     const navStack = useWorkspaceStore(state => state.navStack);
     const navigateBack = useWorkspaceStore(state => state.navigateBack);
     const updateNode = useWorkspaceStore(state => state.updateNode);
+    const convertNodeToContainer = useWorkspaceStore(state => state.convertNodeToContainer);
     const removeNode = useWorkspaceStore(state => state.removeNode);
     const removeEdge = useWorkspaceStore(state => state.removeEdge);
+    const updateEdge = useWorkspaceStore(state => state.updateEdge);
     const removeNodes = useWorkspaceStore(state => state.removeNodes);
     const addEdge = useWorkspaceStore(state => state.addEdge);
     const addNode = useWorkspaceStore(state => state.addNode);
@@ -62,9 +66,11 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     const setHasSelection = useWorkspaceStore(state => state.setHasSelection);
     const connectMode = useWorkspaceStore(state => state.connectMode);
     const setConnectSource = useWorkspaceStore(state => state.setConnectSource);
+    const startEdgeReconnect = useWorkspaceStore(state => state.startEdgeReconnect);
     const clearConnectMode = useWorkspaceStore(state => state.clearConnectMode);
     const setAutoEditNodeId = useWorkspaceStore(state => state.setAutoEditNodeId);
     const executionMode = useWorkspaceStore(state => state.executionMode);
+    const addToast = useToastStore(state => state.addToast);
 
     const reactFlowInstance = useReactFlow();
 
@@ -111,7 +117,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
             id: n.id,
             type: n.type,
             position: { x: n.x, y: n.y },
-            data: { ...n, _isConnectSource: connectMode.sourceNodeId === n.id },
+            data: { ...n, _isConnectSource: connectMode.sourceNodeId === n.id || connectMode.anchorNodeId === n.id },
             draggable: !connectMode.active,
             style: { width: n.width ?? 200 },
         }));
@@ -150,16 +156,32 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         }
     }, [batchUpdatePositions, isTouchDevice]);
 
+    const isValidConnection = useCallback((
+        source: string,
+        target: string,
+        opts?: { ignoreEdgeId?: string }
+    ) => {
+        if (!activeGraphId) return false;
+
+        const currentGraph = graphs[activeGraphId];
+        if (!currentGraph) return false;
+
+        const issue = validateEdgeConnection(currentGraph, source, target, opts?.ignoreEdgeId);
+        if (issue === 'self-loop') {
+            addToast('A task cannot depend on itself.');
+            return false;
+        }
+        if (issue === 'duplicate') {
+            addToast('That dependency already exists.', 'info');
+            return false;
+        }
+        return true;
+    }, [activeGraphId, graphs, addToast]);
+
     // Drag-to-connect edges
     const onConnect = useCallback((connection: Connection) => {
         if (!activeGraphId || !connection.source || !connection.target) return;
-        if (connection.source === connection.target) return;
-
-        const g = graphs[activeGraphId];
-        const exists = g.edges.some(
-            e => e.source === connection.source && e.target === connection.target
-        );
-        if (exists) return;
+        if (!isValidConnection(connection.source, connection.target)) return;
 
         addEdge({
             id: uuidv4(),
@@ -167,7 +189,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
             source: connection.source,
             target: connection.target,
         });
-    }, [activeGraphId, graphs, addEdge]);
+    }, [activeGraphId, addEdge, isValidConnection]);
 
     // Shared delete-selected logic (used by keyboard handler and toolbar button)
     const deleteSelected = useCallback(() => {
@@ -617,14 +639,30 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
     // Node click handler — handles connect mode tap-to-connect + mobile zoom-to-node
     const handleNodeClick = useCallback((_event: React.MouseEvent, node: RFNode) => {
         if (connectMode.active && activeGraphId) {
+            const g = graphs[activeGraphId];
+
+            if (connectMode.edgeId && connectMode.endpoint) {
+                const edge = g.edges.find(e => e.id === connectMode.edgeId);
+                if (!edge) {
+                    clearConnectMode();
+                    return;
+                }
+
+                const next = getReconnectedEdge(edge, connectMode.endpoint, node.id);
+                if (!isValidConnection(next.source, next.target, { ignoreEdgeId: edge.id })) {
+                    return;
+                }
+
+                updateEdge(edge.id, next, activeGraphId);
+                clearConnectMode();
+                try { navigator.vibrate(10); } catch {}
+                return;
+            }
+
             if (!connectMode.sourceNodeId) {
                 setConnectSource(node.id);
             } else if (connectMode.sourceNodeId !== node.id) {
-                const g = graphs[activeGraphId];
-                const exists = g.edges.some(
-                    e => e.source === connectMode.sourceNodeId && e.target === node.id
-                );
-                if (!exists) {
+                if (isValidConnection(connectMode.sourceNodeId, node.id)) {
                     addEdge({
                         id: uuidv4(),
                         graphId: activeGraphId,
@@ -657,7 +695,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 });
             }
         }
-    }, [connectMode, activeGraphId, graphs, addEdge, setConnectSource, clearConnectMode, isTouchDevice, reactFlowInstance]);
+    }, [connectMode, activeGraphId, graphs, addEdge, updateEdge, setConnectSource, clearConnectMode, isTouchDevice, reactFlowInstance, isValidConnection]);
 
     // Context menu handlers
     const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: RFNode) => {
@@ -803,12 +841,32 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
         if (!activeGraphId) return [];
 
         if (target.edgeId) {
-            return [{
+            const edge = graph?.edges.find(e => e.id === target.edgeId);
+            const items: MenuItem[] = [];
+
+            if (edge) {
+                items.push(
+                    {
+                        label: 'Change Prerequisite',
+                        icon: <ArrowRight className="w-4 h-4 -scale-x-100" />,
+                        onClick: () => startEdgeReconnect(edge.id, 'source', edge.target),
+                    },
+                    {
+                        label: 'Change Unlocked Step',
+                        icon: <ArrowRight className="w-4 h-4" />,
+                        onClick: () => startEdgeReconnect(edge.id, 'target', edge.source),
+                    }
+                );
+            }
+
+            items.push({
                 label: 'Remove Dependency',
                 icon: <Trash2 className="w-4 h-4" />,
                 danger: true,
                 onClick: () => removeEdge(target.edgeId!),
-            }];
+            });
+
+            return items;
         }
 
         const colorSwatch = (c: AccentColor) => (
@@ -873,6 +931,11 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                         { label: 'Done', icon: <CheckCircle2 className="w-4 h-4" />, onClick: () => updateNode(target.nodeId!, { status: 'done' }) },
                     ],
                     onClick: () => {},
+                });
+                items.push({
+                    label: 'Convert to Container',
+                    icon: <Layers className="w-4 h-4" />,
+                    onClick: () => convertNodeToContainer(target.nodeId!),
                 });
             }
             items.push({
@@ -954,7 +1017,7 @@ const CanvasInner: React.FC<CanvasInnerProps> = ({ onGenerateFlow }) => {
                 onClick: () => {},
             },
         ];
-    }, [activeGraphId, graph, reactFlowInstance, removeEdge, removeNode, removeNodes, updateNode, batchUpdateNodes, setNodeColor, addNode, setAutoEditNodeId]);
+    }, [activeGraphId, graph, reactFlowInstance, removeEdge, startEdgeReconnect, removeNode, removeNodes, updateNode, convertNodeToContainer, batchUpdateNodes, setNodeColor, addNode, setAutoEditNodeId]);
 
     const buildActionSheetItems = useCallback((): MenuItem[] => {
         if (!actionSheet) return [];

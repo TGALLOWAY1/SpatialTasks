@@ -35,7 +35,7 @@ No URL router — single-page app with in-memory navigation stack.
 ### Canvas & Nodes
 | Component | File | Purpose |
 |-----------|------|---------|
-| CanvasArea | `src/components/Canvas/CanvasArea.tsx` | ReactFlow canvas, pan/zoom, shortcuts, touch gestures |
+| CanvasArea | `src/components/Canvas/CanvasArea.tsx` | ReactFlow canvas, pan/zoom, shortcuts, touch gestures, edge create/rewire flow |
 | BlockedSpotlight | `src/components/Canvas/BlockedSpotlight.tsx` | Predecessor-trace overlay: pulse rings on blockers + chip bar / bottom sheet |
 | LayoutMenu | `src/components/Canvas/LayoutMenu.tsx` | Toolbar popover for Auto-Organize: picks Tidy or Grid + Top-down/Left-right orientation toggle, optional selection-only scope, remembers last used strategy + orientation |
 | ActionNode | `src/components/Nodes/ActionNode.tsx` | Task node: status cycle, inline edit, resize, notes, images, interactive blocked badge |
@@ -67,7 +67,7 @@ No URL router — single-page app with in-memory navigation stack.
 | Component | File | Purpose |
 |-----------|------|---------|
 | ListView | `src/components/ListView/ListView.tsx` | Hierarchical list view with topological sort |
-| FocusView | `src/components/FocusView/FocusView.tsx` | Single-task view: hero image, scrollable notes, status pill that auto-advances on done; transparently drills into containers |
+| FocusView | `src/components/FocusView/FocusView.tsx` | Single-task view: hero image, scrollable notes, status pill that auto-advances on done; transparently drills into containers; entered from TopBar against the active project's root graph |
 | ParallelChooser | `src/components/FocusView/ParallelChooser.tsx` | Condensed list shown by FocusView when a completed task unblocks multiple parallel successors |
 | StepDetailPanel | `src/components/ExecutionPanel/StepDetailPanel.tsx` | Execution mode side panel with Tasks / Notes view switcher; markdown-rendered notes with inline editor and detected links; mobile uses dynamic viewport (dvh) + safe-area inset; marks container as done and advances to next task on "Complete Step & Move On" |
 
@@ -122,12 +122,14 @@ No URL router — single-page app with in-memory navigation stack.
 | Delete folder | `deleteFolder(id, { deleteProjects })` | Either moves inner projects to root (Keep) or cascades deletion of projects + descendant graphs (Delete Too); Delete Too is blocked if it would empty the workspace |
 | Add node | `addNode(node)` | Adds to active graph; sets `autoEditNodeId` for keyboard/context-menu creation |
 | Update node | `updateNode(id, data)` | Partial update |
+| Convert action to container | `convertNodeToContainer(id)` | Switches an action node to container presentation in place, clears action status, preserves title/position/metadata/edges |
 | Remove node | `removeNode(id)` | Removes edges + child graphs recursively |
 | Batch remove | `removeNodes(ids[])` | Batch with cleanup |
 | Cycle status | `cycleNodeStatus(id)` | todo → in_progress → done → todo |
 | Batch positions | `batchUpdatePositions(updates[])` | Drag optimization; also used to commit Auto-Organize results as a single undo entry |
 | Auto-organize canvas | dispatch `{type:'auto-organize', strategy, orientation?, nodeIds?}` → `computeLayout()` → `batchUpdatePositions()` | Two strategies: **Tidy** (dagre Sugiyama; falls back to component-packed grid when subset has no internal edges) and **Grid** (deterministic row-pack sorted by current y/x). TB/LR orientation toggle (Tidy only). Live `width`/`height` from RF passed via `sizeOverrides` so resized containers pack correctly. Anchored to selection bbox or viewport center — no surprise camera jumps; `fitView` only when result spans outside the visible flow rect. Animated via rfInstance.setNodes; nodeIds=[] = selection only; remembers last strategy/orientation in `settings.preferredLayoutStrategy` + `settings.preferredLayoutOrientation`. Legacy values (`cluster`/`hierarchy`/`flow`) migrated on rehydrate. |
 | Add edge | `addEdge(edge)` | Connection between nodes |
+| Update edge | `updateEdge(id, data, graphId?)` | Rewire an existing dependency without recreating it |
 | Remove edge | `removeEdge(id)` | Single edge removal |
 | Enter graph | `enterGraph(graphId, nodeId, label)` | Push navStack |
 | Navigate back | `navigateBack(steps?)` | Pop navStack |
@@ -179,6 +181,7 @@ No URL router — single-page app with in-memory navigation stack.
 | Long-press (500ms) | Action sheet | On nodes, edges, pane; vibration feedback |
 | Swipe right from left edge | Navigate back | 50px start, 100px threshold |
 | Tap node (connect mode) | Start/complete connection | Two-tap flow |
+| Tap node (edge edit mode) | Reconnect selected dependency endpoint | Uses highlighted anchor node + TopBar instruction banner |
 | Pinch | Zoom | ReactFlow native |
 | Pan drag | Pan canvas | ReactFlow native |
 | Status tap | Cycle status | With vibration |
@@ -230,7 +233,7 @@ No URL router — single-page app with in-memory navigation stack.
 | Typed canvas actions replace DOM events | `workspaceStore.ts`, `CanvasArea.tsx`, `TopBar.tsx`, `ActionNode.tsx`, `StepDetailPanel.tsx` | Delete-selected, fit-view, advance-next, auto-organize |
 | Auto-Organize Canvas feature (dagre rewrite) | `src/layout/*`, `src/components/Canvas/LayoutMenu.tsx`, `CanvasArea.tsx`, `TopBar.tsx`, `workspaceStore.ts`, `types/index.ts`, `package.json` | Replaced custom 4-strategy engine (cluster/grid/hierarchy/flow + sweep-line overlap resolver + centroid preservation) with **Tidy** (powered by `@dagrejs/dagre`) and **Grid** (mental-map preserving row-pack). Removed `bboxUtils.ts`, `preserveMap.ts`, `clusterLayout.ts`, `hierarchyLayout.ts`, `flowLayout.ts`. New `sizeMap.ts` reads live measured dimensions from `reactFlowInstance.getNodes()` so resized containers pack correctly. New `anchor.ts` keeps results inside the selection's bbox (or previous canvas anchor) and only triggers `fitView` when the result spans outside the visible flow rect. Toolbar popover (desktop) + overflow-menu entries (touch) + pane context-menu submenu now expose two strategies + a TB/LR orientation toggle. Undo unchanged via `batchUpdatePositions` single commit. Persisted preferences include `preferredLayoutStrategy` (`tidy`/`grid`) and `preferredLayoutOrientation` (`top-down`/`left-right`); legacy values migrated on rehydrate and Supabase hydration. |
 | Code splitting / lazy loading | `App.tsx`, `vite.config.ts` | Bundle size, lazy modal loading, chunk splitting |
-| Focus View mode | `workspaceStore.ts`, `logic.ts`, `TopBar.tsx`, `App.tsx`, `FocusView.tsx`, `ParallelChooser.tsx` | Single-task focus mode with image/notes/status, auto-advance, parallel chooser, container drill-in, edit modal |
+| Focus View mode | `workspaceStore.ts`, `logic.ts`, `TopBar.tsx`, `App.tsx`, `FocusView.tsx`, `ParallelChooser.tsx` | Single-task focus mode with image/notes/status, auto-advance, parallel chooser, container drill-in, edit modal; top-bar entry should preserve the active project when entering focus mode |
 | Project Folders (grouping) | `types/index.ts`, `workspaceStore.ts`, `utils/generator.ts`, `components/Layout/Sidebar.tsx`, `components/UI/FolderDeleteModal.tsx` | Flat (one-level) folders for grouping projects in the sidebar. Covers folder CRUD, collapse/expand persisted state, HTML5 drag-and-drop of projects onto folder headers on desktop, touch fallback (tap ⋯ → "Move to folder…" action sheet), three-button delete modal (Cancel / Keep projects / Delete projects too), v1→v2 migration, zundo tracking of `folders`, and self-healing of Supabase v1 blobs. |
 
 ## Related Documents
